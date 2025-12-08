@@ -1,4 +1,4 @@
-const API_gateway_url = "https://6xwmsk1gm1.execute-api.eu-west-3.amazonaws.com/crowd-sensor-test-stage-pqj441zt/analytics"; // To be changed
+const API_gateway_url = "https://6xwmsk1gm1.execute-api.eu-west-3.amazonaws.com/crowd-sensor-test-stage-pqj441zt"; // To be changed
 
 const environment_flag = "test"
 
