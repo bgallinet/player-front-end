@@ -1,0 +1,28 @@
+/* Reset styles for overlay */
+body.overlay {
+    margin: 0;
+    padding: 0;
+    background: transparent !important;
+    overflow: hidden;
+}
+
+/* Remove any navigation elements */
+.overlay nav,
+.overlay header,
+.overlay footer,
+.overlay .logo,
+.overlay .navigation,
+.overlay .navbar,
+.overlay .nav {
+    display: none !important;
+}
+
+/* Hide navigation spacer */
+body.overlay > div > div[style*="height"] {
+    display: none !important;
+}
+
+/* Hide all buttons except those specifically meant for the overlay */
+.overlay button:not(.overlay-control) {
+    display: none !important;
+} 

@@ -1,0 +1,375 @@
+/* Root Variables */
+:root {
+  --primary-color: #fe4462;
+  --background-color: black;
+  --text-color: white;
+  --font-size-base: 1rem;
+  
+  /* Mobile viewport handling */
+  --vh: 1vh;
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Mobile viewport height fix */
+@supports (height: 100dvh) {
+  :root {
+    --vh: 1dvh;
+  }
+}
+
+/* Base styles */
+html {
+  font-size: var(--font-size-base);
+  -webkit-text-size-adjust: 100%;
+  /* Prevent zoom on iOS when focusing inputs */
+  -webkit-text-size-adjust: 100%;
+  -ms-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  letter-spacing: 0.2px;  /* Improves readability for music titles */
+  background-color: var(--background-color);
+  color: var(--text-color);
+  font-size: clamp(0.75rem, 1.75vw, 1rem); /* Responsive base font size */
+  /* Ensure body height accounts for mobile browsers */
+  min-height: calc(100 * var(--vh));
+  /* Prevent horizontal scroll on mobile */
+  overflow-x: hidden;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
+
+/* Links */
+.App-link {
+  color: #fe4462;
+  text-decoration: none;
+}
+
+.App-link:hover {
+  text-decoration: underline;
+}
+
+
+
+/* Highlighted Text */
+.highlight {
+  color: #fe4462;
+}
+
+/* Media Player */
+.media-player {
+  margin: 20px 0;
+}
+
+.media-player audio,
+.media-player video {
+  width: 100%;
+  max-width: 600px;
+  outline: none;
+}
+
+/* Menu */
+.menu {
+  display: flex;
+  justify-content: space-around;
+  background-color: black;
+  padding: 10px 0;
+}
+
+.menu-item {
+  color: white;
+  text-decoration: none;
+  padding: 10px 20px;
+  transition: background-color 0.3s, color 0.3s;
+}
+
+.menu-item:hover {
+  background-color: #fe4462;
+  color: white;
+}
+
+/* Input */
+input {
+  background-color: white;
+  color: black;
+  border: 1px solid #ccc;
+  padding: 8px;
+  border-radius: 4px;
+}
+
+.App {
+  text-align: center;
+  background-color: var(--background-color);
+  color: var(--text-color);
+  min-height: calc(100 * var(--vh));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: clamp(1.1rem, 3vw, 1.5rem);
+}
+
+/* Logo */
+.App-logo {
+  height: clamp(150px, 40vmin, 300px);
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .App-logo {
+    animation: App-logo-spin infinite 20s linear;
+  }
+}
+
+@keyframes App-logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Fixed positioning for mobile with safe areas */
+.mobile-fixed-bottom {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding-bottom: var(--safe-area-bottom);
+}
+
+@media (max-width: 767.98px) {
+  .mobile-fixed-bottom {
+    bottom: var(--safe-area-bottom);
+  }
+  
+  /* Twitch embed specific fixes for mobile */
+  .twitch-embed-page {
+    /* Use viewport units that bypass Twitch CSP interference */
+    bottom: max(0px, env(safe-area-inset-bottom, 0px)) !important;
+    /* Force layer creation to isolate from Twitch's CSP */
+    transform: translateZ(0);
+    /* Ensure positioning relative to initial containing block */
+    position: fixed !important;
+  }
+  
+  /* Additional isolation for Twitch iframe interference */
+  .twitch-embed-page {
+    /* Create new stacking context isolated from Twitch embeds */
+    isolation: isolate;
+    /* Contain layout to prevent Twitch CSS from affecting this element */
+    contain: layout style;
+  }
+}
+
+/* Twitch-specific mobile viewport fixes */
+@supports (bottom: env(safe-area-inset-bottom)) {
+  @media (max-width: 767.98px) {
+    .twitch-embed-page {
+      /* Use dynamic viewport height that accounts for mobile browsers */
+      bottom: max(env(safe-area-inset-bottom, 0px), calc(100vh - 100dvh)) !important;
+    }
+  }
+}
+
+/* Prevent mobile viewport jumping when address bar appears/disappears */
+@media (max-width: 767.98px) {
+  body {
+    /* Use small viewport height to prevent jumping */
+    min-height: 100svh;
+  }
+  
+  /* Fix jumping issue for all fixed bottom elements on mobile */
+  [style*="position: fixed"][style*="bottom: 0"],
+  .twitch-embed-page {
+    /* Use the most stable viewport unit for mobile */
+    bottom: env(safe-area-inset-bottom, 0px) !important;
+    /* Prevent any transform-based jumping */
+    transform: translate3d(0, 0, 0) !important;
+    /* Use stable height calculation */
+    min-height: calc(6rem + env(safe-area-inset-bottom, 0px)) !important;
+  }
+}
+
+/* Additional mobile browser stability */
+@supports (height: 100dvh) {
+  @media (max-width: 767.98px) {
+    .twitch-embed-page {
+      /* Use dynamic viewport height when available */
+      bottom: max(0px, calc(100vh - 100dvh + env(safe-area-inset-bottom, 0px))) !important;
+    }
+  }
+}
+
+/* Global Button Styling Fix for Dark Backgrounds */
+.btn-outline-light,
+.btn-outline-warning,
+.btn-outline-danger {
+  color: white !important;
+  border-color: var(--primary-color) !important;
+  background-color: transparent !important;
+}
+
+.btn-outline-light:hover,
+.btn-outline-light:focus,
+.btn-outline-light:active,
+.btn-outline-warning:hover,
+.btn-outline-warning:focus,
+.btn-outline-warning:active,
+.btn-outline-danger:hover,
+.btn-outline-danger:focus,
+.btn-outline-danger:active {
+  color: white !important;
+  background-color: var(--primary-color) !important;
+  border-color: var(--primary-color) !important;
+}
+
+/* EQ Vertical Slider Styling */
+.eq-vertical-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  background: linear-gradient(to right, #333 0%, #666 50%, #333 100%);
+  border-radius: 4px;
+  cursor: pointer;
+  outline: none;
+}
+
+/* WebKit (Chrome, Safari, Edge) */
+.eq-vertical-slider::-webkit-slider-track {
+  background: linear-gradient(to right, #333 0%, #666 50%, #333 100%);
+  border-radius: 4px;
+  height: 8px;
+  border: none;
+}
+
+.eq-vertical-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  background: #028cd5;
+  border: 2px solid white;
+  border-radius: 50%;
+  box-shadow: 0 0 5px rgba(0,0,0,0.3);
+  cursor: pointer;
+  height: 20px;
+  width: 20px;
+  transition: all 0.2s ease;
+}
+
+.eq-vertical-slider::-webkit-slider-thumb:hover {
+  box-shadow: 0 0 8px #028cd5;
+  transform: scale(1.1);
+}
+
+/* Firefox */
+.eq-vertical-slider::-moz-range-track {
+  background: linear-gradient(to right, #333 0%, #666 50%, #333 100%);
+  border-radius: 4px;
+  width: 100%;
+  height: 8px;
+  border: none;
+}
+
+.eq-vertical-slider::-moz-range-thumb {
+  background: #028cd5;
+  border: 2px solid white;
+  border-radius: 50%;
+  box-shadow: 0 0 5px rgba(0,0,0,0.3);
+  cursor: pointer;
+  height: 20px;
+  width: 20px;
+  -moz-appearance: none;
+  appearance: none;
+  transition: all 0.2s ease;
+}
+
+.eq-vertical-slider::-moz-range-thumb:hover {
+  box-shadow: 0 0 8px #028cd5;
+  transform: scale(1.1);
+}
+
+.eq-vertical-slider:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.eq-vertical-slider:disabled::-webkit-slider-thumb {
+  cursor: not-allowed;
+}
+
+.eq-vertical-slider:disabled::-moz-range-thumb {
+  cursor: not-allowed;
+}
+
+/* General form-range styling for other sliders */
+.form-range {
+  background: transparent;
+}
+
+.form-range::-webkit-slider-track {
+  background: linear-gradient(to right, #333 0%, #666 50%, #333 100%);
+  border-radius: 15px;
+  height: 8px;
+  border: none;
+}
+
+.form-range::-webkit-slider-thumb {
+  background: #028cd5;
+  border: 2px solid white;
+  border-radius: 50%;
+  box-shadow: 0 0 5px rgba(0,0,0,0.3);
+  cursor: pointer;
+  height: 20px;
+  width: 20px;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.form-range::-webkit-slider-thumb:hover {
+  box-shadow: 0 0 8px #028cd5;
+}
+
+.form-range::-moz-range-track {
+  background: linear-gradient(to right, #333 0%, #666 50%, #333 100%);
+  border-radius: 15px;
+  height: 8px;
+  border: none;
+}
+
+.form-range::-moz-range-thumb {
+  background: #028cd5;
+  border: 2px solid white;
+  border-radius: 50%;
+  box-shadow: 0 0 5px rgba(0,0,0,0.3);
+  cursor: pointer;
+  height: 20px;
+  width: 20px;
+  -moz-appearance: none;
+  appearance: none;
+}
+
+.form-range::-moz-range-thumb:hover {
+  box-shadow: 0 0 8px #028cd5;
+}
+
+.form-range:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.form-range:disabled::-webkit-slider-thumb {
+  cursor: not-allowed;
+}
+
+.form-range:disabled::-moz-range-thumb {
+  cursor: not-allowed;
+}

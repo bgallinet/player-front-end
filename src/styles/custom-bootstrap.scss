@@ -1,0 +1,144 @@
+// Import Bootstrap functions, variables, and mixins
+@import "~bootstrap/scss/functions";
+@import "~bootstrap/scss/variables";
+@import "~bootstrap/scss/mixins";
+
+// Custom variables based on your StyledComponents
+$primary: #fe4462;
+$secondary: #028cd5;
+$dark: #000000;
+$secondary-bg: #0C0C0C;
+
+// Override Bootstrap's theme colors
+$theme-colors: (
+  "primary": $primary,
+  "secondary": $secondary,
+  "dark": $dark
+);
+
+// Fixed values instead of clamp for Bootstrap internal calculations
+$btn-padding-y: 0.75rem;
+$btn-padding-x: 1.5rem;
+$btn-font-size: 1rem;
+$btn-border-width: 2px;
+$btn-border-radius: 4px;
+$btn-transition: background-color 0.3s, color 0.3s, box-shadow 0.3s;
+
+// Form control styles
+$input-font-size: clamp(0.625rem, 1vw, 0.75rem);
+$input-placeholder-color: rgba(0, 0, 0, 0.5);
+$input-color: black;
+$input-bg: white;
+$input-border-color: black;
+$input-border-width: 1px;
+$input-border-radius: 4px;
+$input-padding-y: 0.375rem;
+$input-padding-x: 0.75rem;
+
+// Form control focus state
+$input-focus-border-color: $primary;
+$input-focus-box-shadow: 0 0 0.625rem rgba($primary, 0.25);
+
+// Custom button styles with !important to override inline styles
+.btn {
+  --bs-btn-color: white;
+  --bs-btn-bg: #{$dark};
+  --bs-btn-border-color: #{$primary};
+  --bs-btn-hover-color: white;
+  --bs-btn-hover-bg: #{$primary};
+  --bs-btn-hover-border-color: #{$primary};
+  --bs-btn-active-color: white;
+  --bs-btn-active-bg: #{$primary};
+  --bs-btn-active-border-color: #{$primary};
+  --bs-btn-disabled-color: white;
+  --bs-btn-disabled-bg: #{$dark};
+  --bs-btn-disabled-border-color: #{$primary};
+  
+  font-size: clamp(0.625rem, 1vw, 0.75rem) !important;
+  padding: clamp(0.25rem, 1vw, 0.5rem) clamp(0.5rem, 1.5vw, 1rem);
+  margin: 0.25rem clamp(0.25rem, 1vw, 0.5rem);
+  cursor: pointer;
+  border-radius: 4px;
+  white-space: nowrap !important;  // Prevent text wrapping
+  overflow: hidden !important;     // Hide overflow
+  text-overflow: ellipsis !important;  // Show ellipsis for overflow
+  max-width: 100%;                // Ensure button doesn't overflow container
+
+  &.btn-outline-light {
+    --bs-btn-color: white;
+    --bs-btn-border-color: #{$primary};
+    --bs-btn-hover-color: white;
+    --bs-btn-hover-bg: #{$primary};
+    --bs-btn-hover-border-color: #{$primary};
+    --bs-btn-active-color: white;
+    --bs-btn-active-bg: #{$primary};
+    --bs-btn-active-border-color: #{$primary};
+  }
+}
+
+// Custom form control styles with !important to override inline styles
+.form-control {
+  font-size: $input-font-size !important;
+  background-color: #{$secondary-bg};
+  border: 1px solid #{$secondary};
+  border-radius: 4px;
+  color: white;
+  padding: 0.5rem;
+  transition: box-shadow 0.3s ease;
+  width: auto;
+
+  &:focus {
+    background-color: #{$secondary-bg};
+    border-color: #{$secondary};
+    box-shadow: 0 0 0.3125rem #{$secondary};
+    color: white;
+    outline: none;
+  }
+
+  &::placeholder {
+    font-size: $input-font-size !important;
+    color: $input-placeholder-color !important;
+  }
+
+  // Number input styles
+  &[type="number"] {
+    width: 5rem;
+    
+    &::-webkit-inner-spin-button,
+    &::-webkit-outer-spin-button {
+      opacity: 1;
+      height: 1.5rem;
+    }
+    -moz-appearance: textfield;
+  }
+
+  // Search input styles
+  &[type="search"] {
+    width: 20rem;
+    padding-left: 2rem;
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="%23028cd5" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>');
+    background-repeat: no-repeat;
+    background-position: 0.5rem center;
+  }
+
+  // Text input default width
+  &[type="text"] {
+    width: 15rem;
+  }
+}
+
+// Input group styling
+.input-group {
+  gap: 0.5rem;
+}
+
+// Card styling
+.card {
+  background-color: #{$dark};
+  border: 0.125rem solid #{$secondary};
+  border-radius: 0.9375rem;
+  box-shadow: 0 0 0.9375rem #{$secondary};
+}
+
+// Import the rest of Bootstrap
+@import "~bootstrap/scss/bootstrap"; 

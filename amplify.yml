@@ -1,0 +1,67 @@
+version: 1
+frontend:
+  phases:
+    preBuild:
+      commands:
+        - npm ci
+    build:
+      commands:
+        - npm run build
+  artifacts:
+    baseDirectory: build
+    files:
+      - '**/*'
+  cache:
+    paths:
+      - node_modules/**/*
+  customHeaders:
+    - pattern: '**/*.mp4'
+      headers:
+        - key: 'Content-Type'
+          value: 'video/mp4'
+    - pattern: '**/*.webm'
+      headers:
+        - key: 'Content-Type'
+          value: 'video/webm'
+    - pattern: '**/*.ogg'
+      headers:
+        - key: 'Content-Type'
+          value: 'video/ogg'
+    - pattern: '**/*.m4a'
+      headers:
+        - key: 'Content-Type'
+          value: 'audio/mp4'
+        - key: 'Access-Control-Allow-Origin'
+          value: '*'
+        - key: 'Access-Control-Allow-Methods'
+          value: 'GET, HEAD, OPTIONS'
+    - pattern: '**/*.mp3'
+      headers:
+        - key: 'Content-Type'
+          value: 'audio/mpeg'
+        - key: 'Access-Control-Allow-Origin'
+          value: '*'
+        - key: 'Access-Control-Allow-Methods'
+          value: 'GET, HEAD, OPTIONS'
+    - pattern: '**/*.wasm'
+      headers:
+        - key: 'Content-Type'
+          value: 'application/wasm'
+        - key: 'Cross-Origin-Embedder-Policy'
+          value: 'require-corp'
+        - key: 'Cross-Origin-Opener-Policy'
+          value: 'same-origin'
+    - pattern: '**/*.task'
+      headers:
+        - key: 'Content-Type'
+          value: 'application/octet-stream'
+        - key: 'Cross-Origin-Embedder-Policy'
+          value: 'require-corp'
+        - key: 'Cross-Origin-Opener-Policy'
+          value: 'same-origin'
+    - pattern: '**/*'
+      headers:
+        - key: 'Cross-Origin-Embedder-Policy'
+          value: 'unsafe-none'
+        - key: 'Cross-Origin-Opener-Policy'
+          value: 'unsafe-none' 
