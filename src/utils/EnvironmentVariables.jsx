@@ -1,22 +1,37 @@
-//Powershell command for getting the API gateway URL:
-// aws apigateway get-rest-apis --query "items[*].[id,name]" --output text | ForEach-Object { $parts = $_ -split '\s+'; $apiId = $parts[0]; $apiName = $parts[1]; $stages = aws apigateway get-stages --rest-api-id $apiId --query "item[*].stageName" --output text; $stages -split '\s+' | ForEach-Object { Write-Output "$apiName - https://$apiId.execute-api.us-east-1.amazonaws.com/$_" } }
+const API_gateway_url = "https://2mhony0x02.execute-api.eu-west-3.amazonaws.com/crowd-sensor-production-stage-3145cbuc"; // To be changed
 
-const API_gateway_url = "https://b3haxrqdjj.execute-api.eu-west-3.amazonaws.com/crowd-sensor-dev-stage-0j7gp6tj"; // To be changed
+const environment_flag = "test"
 
-// WebSocket URLs (without protocol - will be auto-detected based on page protocol)
-const WebSocketURL = "ws-dev.crowd-sensor.com"; // Domain endpoint (HTTPS pages → wss://)
-const WebSocketTestURL = "crowd-sensor-dev-websocket-alb-806078002.eu-west-3.elb.amazonaws.com"; // ALB direct URL (HTTP pages → ws://)
+// WebSocket URLs
+const WebSocketURL = "ws-test.crowd-sensor.com"; // Domain endpoint (HTTPS pages → wss://)
+const WebSocketTestURL = "crowd-sensor-test-websocket-alb-293139646.eu-west-3.elb.amazonaws.com"; // ALB direct URL (HTTP pages → ws://)
 
-const environment_flag = "dev"
+// PKCE helper functions for prod and test environments
+const generateCodeVerifier = () => {
+    const array = new Uint8Array(32);
+    crypto.getRandomValues(array);
+    return btoa(String.fromCharCode(...array))
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=/g, '');
+};
 
-const AuthURL = 'https://d3o5hrtbl653it.auth.eu-west-3.amazoncognito.com/oauth2/authorize?client_id=3ng1jhbo6oemarms0uc9mhadak&response_type=code&scope=email+openid&redirect_uri=http%3A%2F%2Flocalhost%3A3000%2Fcallback';
+const generateCodeChallenge = async (verifier) => {
+    const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
+    return btoa(String.fromCharCode(...new Uint8Array(hash)))
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=/g, '');
+};
 
+// Test environment configuration
+const ClientID = '48mbuimag81pc52odtsight2g5';
+const RedirectURI = 'https://test.d22r3tk88qmw9i.amplifyapp.com/callback';
 
-const CognitoURL = 'https://d3o5hrtbl653it.auth.eu-west-3.amazoncognito.com/oauth2/token';
+// AuthURL with PKCE for test (confidential client) - WITHOUT empty code_challenge
+const AuthURL = `https://d3o5hrtbl653it.auth.eu-west-3.amazoncognito.com/oauth2/authorize?client_id=${ClientID}&response_type=code&scope=email+openid&redirect_uri=${encodeURIComponent(RedirectURI)}&code_challenge_method=S256`;
 
-const RedirectURI = 'http://localhost:3000/callback';
-
-const ClientID = '3ng1jhbo6oemarms0uc9mhadak';
+const CognitoURL = 'https://d3o5hrtbl653it.auth.eu-west-3.amazoncognito.com/oauth2/token'
 
 const EnvironmentVariables = {
     AuthURL: AuthURL,
@@ -28,11 +43,13 @@ const EnvironmentVariables = {
     RedirectURI: RedirectURI,
     CognitoURL: CognitoURL,
     ClientID: ClientID,
-    environment_flag: environment_flag
+    environment_flag: environment_flag,
+    generateCodeVerifier: generateCodeVerifier,
+    generateCodeChallenge: generateCodeChallenge
 };
 
 export default EnvironmentVariables;
 
 // Export individual values for convenience
 export const AnalyticsAPI_URL = EnvironmentVariables.AnalyticsAPI_URL;
-export { WebSocketURL, WebSocketTestURL }; // Re-export WebSocket URLs
+export { WebSocketURL, WebSocketTestURL };
