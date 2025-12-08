@@ -606,6 +606,9 @@ const SoundConsole = ({
             } else {
                 resetToBaseValues();
             }
+        } else {
+            // Reset to base values when recommendation is null (e.g., hands no longer raised)
+            resetToBaseValues();
         }
     }, [currentRecommendation, applyEmotionVolume, resetToBaseValues]);
 

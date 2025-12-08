@@ -99,15 +99,17 @@ export const DEFAULT_EQ_MAPPINGS = {
     'nodding+happy': [-4, -3, 5, 8, 7, 3],      // vocal
     'nodding+surprised': [-3, -2, 0, 3, 6, 8],  // treble-boost
     'nodding+neutral': [8, 6, 3, 0, -2, -3],    // bass-boost
+    'handsRaised': [8, 6, 3, 0, -2, -3],        // bass-boost
     'happy': [0, 0, 0, 0, 0, 0],                // flat
     'surprised': [0, 0, 0, 0, 0, 0],            // flat
     'neutral': [0, 0, 0, 0, 0, 0]               // flat
 };
 
 export const DEFAULT_VOLUME_MAPPINGS = {
-    'nodding+happy': 1.3,
-    'nodding+surprised': 1.3, 
-    'nodding+neutral': 1.45,
+    'nodding+happy': 1.0,
+    'nodding+surprised': 1.0, 
+    'nodding+neutral': 1.0,
+    'handsRaised': 1.2,
     'happy': 1.0,
     'surprised': 1.0,
     'neutral': 1.0
@@ -119,6 +121,7 @@ export const DEFAULT_RHYTHMIC_ENHANCEMENT_MAPPINGS = {
     'nodding+happy': 0,
     'nodding+surprised': 0, 
     'nodding+neutral': 0,
+    'handsRaised': 0,
     'happy': 100,
     'surprised': 0,
     'neutral': 0
@@ -128,6 +131,7 @@ export const DEFAULT_REVERB_MAPPINGS = {
     'nodding+happy': 0,
     'nodding+surprised': 0, 
     'nodding+neutral': 0,
+    'handsRaised': 0,
     'happy': 0,
     'surprised': 50,
     'neutral': 0
@@ -137,6 +141,7 @@ export const DEFAULT_DELAY_MAPPINGS = {
     'nodding+happy': 0,
     'nodding+surprised': 0, 
     'nodding+neutral': 0,
+    'handsRaised': 0,
     'happy': 0,
     'surprised': 40,
     'neutral': 0
@@ -147,6 +152,7 @@ const ReactionToSoundMapper = ({
     // Reaction data (all values are NUMERIC)
     emotionDataArray = [],           // Array of recent reaction detections - each item contains numeric values: {timestamp, smiling: 0-1, jawOpen: 0-1, amplitude, frequency, xPosition, yPosition, width, height}
     noddingAmplitude = 0,             // Current nodding amplitude (number, 0.0-1.0+ range, >0.03 = nodding)
+    handsRaised = false,               // Whether hands are raised (boolean)
     
     // Body pose data (future use) - will contain numeric pose coordinates
     bodyPoseDataArray = [],           // Array of recent body pose detections
@@ -263,9 +269,21 @@ const ReactionToSoundMapper = ({
     }, [noddingAmplitude]);
     
     /**
-     * Combine emotion with nodding state to create compound emotion state
+     * Determine if hands are raised
+     */
+    const areHandsRaised = useCallback(() => {
+        return handsRaised === true;
+    }, [handsRaised]);
+    
+    /**
+     * Combine emotion with nodding state and hand raising to create compound emotion state
      */
     const determineEmotionState = useCallback((dominantEmotion) => {
+        // Hand raising takes priority as standalone state
+        if (areHandsRaised()) {
+            return 'handsRaised';
+        }
+        
         if (!dominantEmotion) {
             return null;
         }
@@ -276,7 +294,7 @@ const ReactionToSoundMapper = ({
         }
         
         return dominantEmotion;
-    }, [isNodding]);
+    }, [isNodding, areHandsRaised]);
     
     /**
      * Generate audio parameter recommendations based on current emotion state
@@ -285,9 +303,13 @@ const ReactionToSoundMapper = ({
         // Step 1: Analyze emotion data
         const dominantEmotion = analyzeDominantEmotion(emotionDataArray);
         
-        // Step 2: Determine emotion state (with nodding)
+        // Step 2: Determine emotion state (with nodding or hand raising)
         const emotionState = determineEmotionState(dominantEmotion);
         
+        // If no emotion state determined, return null (no recommendation)
+        if (!emotionState) {
+            return null;
+        }
         
         // Step 3: Look up mappings for this emotion state
         const eqMapping = eqMappings[emotionState];
@@ -312,6 +334,7 @@ const ReactionToSoundMapper = ({
             dominantEmotion,
             noddingAmplitude: isNodding() ? noddingAmplitude : 0,
             isNodding: isNodding(),
+            handsRaised: areHandsRaised(),
             
             // Audio parameters - use exact values from mappings, no fallbacks
             eqPreset: eqPresetKeyword,        // Keep keyword for UI compatibility
@@ -338,6 +361,7 @@ const ReactionToSoundMapper = ({
     }, [
         emotionDataArray,
         noddingAmplitude,
+        handsRaised,
         eqMappings,
         volumeMappings,
         rhythmicEnhancementMappings,
@@ -346,6 +370,7 @@ const ReactionToSoundMapper = ({
         analyzeDominantEmotion,
         determineEmotionState,
         isNodding,
+        areHandsRaised,
         getEQVector
     ]);
     
@@ -360,8 +385,9 @@ const ReactionToSoundMapper = ({
         // Compare key fields with more sensitive thresholds for better responsiveness
         return newRec.emotionState !== oldRec.emotionState ||
                newRec.eqPreset !== oldRec.eqPreset ||
-               Math.abs(newRec.volumeMultiplier - oldRec.volumeMultiplier) > 0.01 ||  // More sensitive to volume changes
-               Math.abs(newRec.noddingAmplitude - oldRec.noddingAmplitude) > THRESHOLD_NODDING || // More sensitive to nodding changes
+               newRec.handsRaised !== oldRec.handsRaised || // Check hand raising changes
+               Math.abs((newRec.volumeMultiplier || 0) - (oldRec.volumeMultiplier || 0)) > 0.01 ||  // More sensitive to volume changes
+               Math.abs((newRec.noddingAmplitude || 0) - (oldRec.noddingAmplitude || 0)) > THRESHOLD_NODDING || // More sensitive to nodding changes
                Math.abs((newRec.rhythmicEnhancement || 0) - (oldRec.rhythmicEnhancement || 0)) > 0.01 || // Check rhythmic enhancement changes
                Math.abs((newRec.reverbAmount || 0) - (oldRec.reverbAmount || 0)) > 0.01 || // Check reverb changes
                Math.abs((newRec.delayAmount || 0) - (oldRec.delayAmount || 0)) > 0.01; // Check delay changes
@@ -391,20 +417,18 @@ const ReactionToSoundMapper = ({
             }
         };
         
-        // Only set up interval if we have data to process
-        if (emotionDataArray && emotionDataArray.length > 0) {
-            // Process immediately
-            processReactions();
-            
-            // Set up interval for continuous processing
-            // Use configurable interval from ReactionMapperConfig (1000ms = 1Hz for once per second)
-            const interval = setInterval(processReactions, REACTION_MAPPER_UPDATE_INTERVAL);
-            
-            return () => {
-                clearInterval(interval);
-            };
-        }
-    }, [onRecommendationChange, emotionDataArray]);
+        // Always process to detect state changes (including when hands are raised/lowered)
+        // Process immediately
+        processReactions();
+        
+        // Set up interval for continuous processing
+        // Use configurable interval from ReactionMapperConfig (1000ms = 1Hz for once per second)
+        const interval = setInterval(processReactions, REACTION_MAPPER_UPDATE_INTERVAL);
+        
+        return () => {
+            clearInterval(interval);
+        };
+    }, [onRecommendationChange, emotionDataArray, noddingAmplitude, handsRaised, generateRecommendation, hasRecommendationChanged]);
     
     // This is a headless component - no visual output
     return null;

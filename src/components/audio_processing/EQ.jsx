@@ -207,6 +207,9 @@ const EQ = ({
             } else {
                 resetEQ();
             }
+        } else {
+            // Reset EQ when recommendation is null (e.g., hands no longer raised)
+            resetEQ();
         }
     }, [recommendation]);
 

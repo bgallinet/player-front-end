@@ -3,6 +3,7 @@ import { Container, Alert } from 'react-bootstrap';
 import { Text, StyledCard } from '../../utils/StyledComponents';
 import { secondaryColor } from '../../utils/DisplaySettings';
 import FacialLandmarkUserUI from '../sensing/FacialLandmarkUserUI';
+import BodyPoseUserUI from '../sensing/BodyPoseUserUI';
 import TutorialMessage from '../TutorialMessage';
 import SoundConsole from '../audio_processing/SoundConsole';
 import AudioControls from './AudioControls';
@@ -58,6 +59,7 @@ const Player = ({
     const [baseVolume, setBaseVolume] = useState(0.5);
     const [stream, setStream] = useState(null);
     const [noddingAmplitude, setNoddingAmplitude] = useState(0);
+    const [handsRaised, setHandsRaised] = useState(false);
     
     // Emotion data array for ReactionToSoundMapper
     const [emotionDataArray, setEmotionDataArray] = useState([]);
@@ -77,6 +79,9 @@ const Player = ({
     // Demo session logic
     const [is_demo_session, setIsDemoSession] = useState(false);
     const [demo_username, setDemoUsername] = useState(() => getDemoUsername());
+    
+    // Detection mode state: 'landmark' or 'body'
+    const [detectionMode, setDetectionMode] = useState('landmark');
     
     // Tutorial functionality
     const { isTutorialMode, toggleTutorialMode } = useTutorial();
@@ -235,6 +240,15 @@ const Player = ({
                 } else {
                     setEmotionDataArray([]);
                     setNoddingAmplitude(0);
+                }
+                
+                // Collect hand raising data from localStorage
+                try {
+                    const leftHandRaised = localStorage.getItem('left_hand_raised') === 'true';
+                    const rightHandRaised = localStorage.getItem('right_hand_raised') === 'true';
+                    setHandsRaised(leftHandRaised || rightHandRaised);
+                } catch (error) {
+                    setHandsRaised(false);
                 }
                 
             } catch (error) {
@@ -451,6 +465,11 @@ const Player = ({
         }
     };
 
+    // Handle detection mode change
+    const handleDetectionModeChange = (mode) => {
+        setDetectionMode(mode);
+    };
+
     return (
         <Container fluid className="mt-4 px-3">
             {/* Tutorial Message */}
@@ -492,6 +511,8 @@ const Player = ({
                             onProgressClick={handleProgressClick}
                             onAudioDeviceClick={() => setShowAudioModal(true)}
                             onEmotionMappingClick={() => setShowEmotionMappings(true)}
+                            detectionMode={detectionMode}
+                            onDetectionModeChange={handleDetectionModeChange}
                             tutorialDismissed={playerTutorialDismissed}
                             setTutorialDismissed={setPlayerTutorialDismissed}
                             hasPrevious={playlist.length > 0 && currentTrackIndex > 0}
@@ -576,6 +597,7 @@ const Player = ({
                             <ReactionToSoundMapper
                                 emotionDataArray={emotionDataArray}
                                 noddingAmplitude={noddingAmplitude}
+                                handsRaised={handsRaised}
                                 eqMappings={eqMappings}
                                 volumeMappings={volumeMappings}
                                 rhythmicEnhancementMappings={rhythmicEnhancementMappings}
@@ -618,16 +640,30 @@ const Player = ({
                 onToggleEmotionMappings={setShowEmotionMappings}
             />
             
-            {/* Facial Landmark Detection UI - positioned at bottom */}
+            {/* Detection UI - Conditional rendering based on mode */}
             {selectedFile && stream && (
-                <FacialLandmarkUserUI 
-                    stream={stream}
-                    embeddingTW={false}
-                    is_demo_session={is_demo_session}
-                    demo_username={demo_username}
-                    sessionName={`${pageName}_session`}
-                    sizeMode="large"
-                />
+                <>
+                    {detectionMode === 'landmark' && (
+                        <FacialLandmarkUserUI 
+                            stream={stream}
+                            embeddingTW={false}
+                            is_demo_session={is_demo_session}
+                            demo_username={demo_username}
+                            sessionName={`${pageName}_session`}
+                            sizeMode="large"
+                        />
+                    )}
+                    {detectionMode === 'body' && (
+                        <BodyPoseUserUI 
+                            stream={stream}
+                            embeddingTW={false}
+                            is_demo_session={is_demo_session}
+                            demo_username={demo_username}
+                            sessionName={`${pageName}_session`}
+                            sizeMode="large"
+                        />
+                    )}
+                </>
             )}
             
             {/* Spacing div to avoid cropping */}
