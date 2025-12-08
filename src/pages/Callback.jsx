@@ -26,10 +26,10 @@ export default function Callback() {
 
                 console.log('code', code);
 
-                // Check if we're in prod environment for PKCE flow
-                if (EnvironmentVariables.environment_flag === 'prod') {
-                    // PROD: Use PKCE flow with fetchTokens
-                    console.log('PROD: Using PKCE flow for confidential client');
+                // Check if we're in prod or test environment for PKCE flow
+                if (EnvironmentVariables.environment_flag === 'prod' || EnvironmentVariables.environment_flag === 'test') {
+                    // PROD/TEST: Use PKCE flow with fetchTokens
+                    console.log(`${EnvironmentVariables.environment_flag.toUpperCase()}: Using PKCE flow for confidential client`);
                     console.log('🔍 Callback: Checking sessionStorage for code_verifier');
                     console.log('🔍 Callback: sessionStorage code_verifier:', sessionStorage.getItem('code_verifier'));
                     console.log('🔍 Callback: All sessionStorage keys:', Object.keys(sessionStorage));
@@ -44,11 +44,11 @@ export default function Callback() {
                     createUser();
                     navigate('/');
                 } else {
-                    // NON-PROD: Use existing logic for standard OAuth flow
-                    console.log('NON-PROD: Using standard OAuth flow');
+                    // NON-PROD/TEST: Use existing logic for standard OAuth flow
+                    console.log('NON-PROD/TEST: Using standard OAuth flow');
                     
-                    // For non-prod, you might need to implement standard token exchange here
-                    // or ensure fetchTokens handles non-prod environments properly
+                    // For non-prod/test, you might need to implement standard token exchange here
+                    // or ensure fetchTokens handles non-prod/test environments properly
                     const tokens = await fetchTokens(code);
                     
                     if (!tokens) {
