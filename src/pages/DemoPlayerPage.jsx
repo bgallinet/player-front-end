@@ -17,7 +17,6 @@ const DemoPlayerPage = () => {
     const [error, setError] = useState('');
     const [showEvaluationForm, setShowEvaluationForm] = useState(false);
     const audioRef = useRef(null);
-    const evaluationTimerRef = useRef(null);
     const { idToken } = useAuth();
 
     // Evaluation form questions and input types
@@ -59,35 +58,15 @@ const DemoPlayerPage = () => {
         return () => clearTimeout(timer);
     }, []);
 
-    // Handle music play event to start evaluation timer
+    // Handle music play event (no automatic popup)
     const handleMusicPlay = () => {
-        // Clear any existing timer
-        if (evaluationTimerRef.current) {
-            clearTimeout(evaluationTimerRef.current);
-        }
-        
-        // Set timer to show evaluation form after 2 minutes
-        evaluationTimerRef.current = setTimeout(() => {
-            setShowEvaluationForm(true);
-        }, 120000); // 2 minutes (120 seconds)
+        // No automatic evaluation form popup
     };
 
-    // Handle music pause/stop to cancel timer
+    // Handle music pause/stop
     const handleMusicPause = () => {
-        if (evaluationTimerRef.current) {
-            clearTimeout(evaluationTimerRef.current);
-            evaluationTimerRef.current = null;
-        }
+        // No timer to cancel
     };
-
-    // Cleanup timer on component unmount
-    useEffect(() => {
-        return () => {
-            if (evaluationTimerRef.current) {
-                clearTimeout(evaluationTimerRef.current);
-            }
-        };
-    }, []);
 
     // Handle track selection from TrackChoice
     const handleTrackSelect = (file) => {
@@ -152,21 +131,6 @@ const DemoPlayerPage = () => {
                             overflow: 'visible'
                         }}
                     />
-                    <button
-                        className="btn btn-outline-primary"
-                        onClick={() => setShowEvaluationForm(true)}
-                        style={{
-                            padding: '0.75rem 1.5rem',
-                            fontSize: '1rem',
-                            color: 'white',
-                            whiteSpace: 'nowrap',
-                            minWidth: 'fit-content',
-                            textOverflow: 'unset',
-                            overflow: 'visible'
-                        }}
-                    >
-                        Feedback
-                    </button>
                     {!idToken && (
                         <SignUpButton />
                     )}
@@ -189,6 +153,7 @@ const DemoPlayerPage = () => {
                 sessionName={null}
                 show={showEvaluationForm}
                 onHide={() => setShowEvaluationForm(false)}
+                disableSubmission={true}
             />
         </Player>
     );

@@ -50,7 +50,8 @@ const EvaluationForm = ({
     is_demo_session = false,
     sessionName = null,
     show = false,
-    onHide = () => {}
+    onHide = () => {},
+    disableSubmission = false
 }) => {
     const [responses, setResponses] = useState({});
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -72,6 +73,11 @@ const EvaluationForm = ({
     // Handle form submission
     const handleSubmit = async (event) => {
         event.preventDefault();
+        
+        if (disableSubmission) {
+            return;
+        }
+        
         setIsSubmitting(true);
 
         try {
@@ -349,22 +355,24 @@ const EvaluationForm = ({
                         );
                     })}
                     
-                    <div className="d-flex justify-content-end mt-4 pt-3" style={{ borderTop: '1px solid #333' }}>
-                        <Button
-                            type="submit"
-                            variant="primary"
-                            disabled={isSubmitting}
-                            style={{ 
-                                minWidth: '120px',
-                                backgroundColor: secondaryColor,
-                                borderColor: secondaryColor,
-                                fontSize: '1rem',
-                                padding: '0.75rem 1.5rem'
-                            }}
-                        >
-                            {isSubmitting ? 'Submitting...' : 'Submit'}
-                        </Button>
-                    </div>
+                    {!disableSubmission && (
+                        <div className="d-flex justify-content-end mt-4 pt-3" style={{ borderTop: '1px solid #333' }}>
+                            <Button
+                                type="submit"
+                                variant="primary"
+                                disabled={isSubmitting}
+                                style={{ 
+                                    minWidth: '120px',
+                                    backgroundColor: secondaryColor,
+                                    borderColor: secondaryColor,
+                                    fontSize: '1rem',
+                                    padding: '0.75rem 1.5rem'
+                                }}
+                            >
+                                {isSubmitting ? 'Submitting...' : 'Submit'}
+                            </Button>
+                        </div>
+                    )}
                 </form>
             </div>
         </div>

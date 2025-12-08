@@ -42,9 +42,9 @@ const Home = () => {
             {isTutorialMode && !homeTutorialDismissed && (
                 <TutorialMessage 
                     messages={[
-                        "Welcome to TuneTribes! This is your home page where you can sign up, login, and access all features.",
-                        "Pick a live session and dive into the music. Join the party, connect with creators and other fans in real-time!",
-                        "For creators and artists, go to 'Create' page, start, customize and monitor your own show. Receive real-time audience reactions and interact with your fans."
+                        "Welcome to TuneTribes player! This is your home page where you can sign up, login, and access all features.",
+                        "Experience music with movement-responsive audio enhancement in the player.",
+                        "You can customize audio mappings to create your own personal audio experience."
                     ]}
                     position="top-center"
                     onClose={() => setHomeTutorialDismissed(true)}
