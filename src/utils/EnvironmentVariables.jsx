@@ -1,41 +1,39 @@
-//Powershell command for getting the API gateway URL:
-// aws apigateway get-rest-apis --query "items[*].[id,name]" --output text | ForEach-Object { $parts = $_ -split '\s+'; $apiId = $parts[0]; $apiName = $parts[1]; $stages = aws apigateway get-stages --rest-api-id $apiId --query "item[*].stageName" --output text; $stages -split '\s+' | ForEach-Object { Write-Output "$apiName - https://$apiId.execute-api.us-east-1.amazonaws.com/$_" } }
-
-const API_gateway_url = "https://vljtvzoqub.execute-api.eu-west-3.amazonaws.com/crowd-sensor-dev-stage-6juxwrss"; // To be changed
+// API Gateway URL - using custom domain for stable endpoint
+const API_gateway_url = "https://9ic2sonafk.execute-api.eu-west-3.amazonaws.com/player-test-stage-yf4kl6vh";
 
 // WebSocket URLs (without protocol - will be auto-detected based on page protocol)
-const WebSocketURL = "ws-dev.crowd-sensor.com"; // Domain endpoint (HTTPS pages → wss://)
-const WebSocketTestURL = "crowd-sensor-dev-websocket-alb-806078002.eu-west-3.elb.amazonaws.com"; // ALB direct URL (HTTP pages → ws://)
+const WebSocketURL = "ws-player-test.crowd-sensor.com"; // Domain endpoint (HTTPS pages → wss://)
+const WebSocketTestURL = "player-test-websocket-alb-620473978.eu-west-3.elb.amazonaws.com"; // ALB direct URL (HTTP pages → ws://)
 
-const environment_flag = "dev"
+const environment_flag = "prod"
 
-// Dynamically detect protocol (http or https) based on current page
-const getCurrentProtocol = () => {
-    if (typeof window !== 'undefined') {
-        return window.location.protocol; // 'http:' or 'https:'
-    }
-    return 'http:'; // Default fallback
+// PKCE helper functions for prod environment
+const generateCodeVerifier = () => {
+    const array = new Uint8Array(32);
+    crypto.getRandomValues(array);
+    return btoa(String.fromCharCode(...array))
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=/g, '');
 };
 
-const getCurrentHost = () => {
-    if (typeof window !== 'undefined') {
-        return window.location.host; // 'localhost:3000' or whatever
-    }
-    return 'localhost:3000'; // Default fallback
+const generateCodeChallenge = async (verifier) => {
+    const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
+    return btoa(String.fromCharCode(...new Uint8Array(hash)))
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=/g, '');
 };
 
-// Build redirect URI dynamically based on current page protocol
-const RedirectURI = `${getCurrentProtocol()}//${getCurrentHost()}/callback`;
+// Prod environment configuration only
+const ClientID = '13042d8nu2ed805be955pnhu0i';
+const RedirectURI = 'https://soundbloom-player.com/callback';
 
-// Build AuthURL with dynamically detected redirect URI
-const AuthURL = `https://d3o5hrtbl653it.auth.eu-west-3.amazoncognito.com/oauth2/authorize?client_id=3ng1jhbo6oemarms0uc9mhadak&response_type=code&scope=email+openid&redirect_uri=${encodeURIComponent(RedirectURI)}`;
+// AuthURL with PKCE for prod (confidential client) - WITHOUT empty code_challenge
+const AuthURL = `https://d3o5hrtbl653it.auth.eu-west-3.amazoncognito.com/oauth2/authorize?client_id=${ClientID}&response_type=code&scope=email+openid&redirect_uri=${encodeURIComponent(RedirectURI)}&code_challenge_method=S256`;
 
 const CognitoURL = 'https://d3o5hrtbl653it.auth.eu-west-3.amazoncognito.com/oauth2/token';
 
-const ClientID = '3ng1jhbo6oemarms0uc9mhadak';
-
-// Twitch Client ID (for client-side OAuth)
-const TWITCH_CLIENT_ID = 'fsg5ymbfmhtybitjmm6knlb8iu3p8k';
 
 const EnvironmentVariables = {
     AuthURL: AuthURL,
@@ -47,8 +45,9 @@ const EnvironmentVariables = {
     RedirectURI: RedirectURI,
     CognitoURL: CognitoURL,
     ClientID: ClientID,
-    TWITCH_CLIENT_ID: TWITCH_CLIENT_ID,
-    environment_flag: environment_flag
+    environment_flag: environment_flag,
+    generateCodeVerifier: generateCodeVerifier,
+    generateCodeChallenge: generateCodeChallenge
 };
 
 export default EnvironmentVariables;
