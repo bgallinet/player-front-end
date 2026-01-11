@@ -77,8 +77,10 @@ export const initiateLogin = async () => {
         console.log('🔍 - cookie:', document.cookie.includes('code_verifier'));
         console.log('🔍 All localStorage keys:', Object.keys(localStorage));
         
-        // Build AuthURL with PKCE challenge - FIXED: Add &code_challenge= parameter
-        const authUrl = EnvironmentVariables.AuthURL + '&code_challenge=' + codeChallenge;
+        // Build AuthURL with PKCE challenge - Rebuild with dynamic redirect URI
+        // Get the current redirect URI (may be dynamic based on current host)
+        const redirectUri = EnvironmentVariables.RedirectURI;
+        const authUrl = `https://d3o5hrtbl653it.auth.eu-west-3.amazoncognito.com/oauth2/authorize?client_id=${EnvironmentVariables.ClientID}&response_type=code&scope=email+openid&redirect_uri=${encodeURIComponent(redirectUri)}&code_challenge_method=S256&code_challenge=${codeChallenge}`;
         console.log('🔍 Final AuthURL:', authUrl);
         
         // SIMPLE STANDARD APPROACH: Store in sessionStorage (survives redirects)
@@ -156,7 +158,7 @@ export const fetchTokens = async (code) => {
             throw new Error('Code verifier not found. Please try logging in again.');
         }
 
-        // Build params for prod/test environment (with client secret)
+        // Build params for prod/test environment (with client secret for confidential clients)
         const params = new URLSearchParams({
             grant_type: 'authorization_code',
             client_id: EnvironmentVariables.ClientID,
@@ -165,13 +167,14 @@ export const fetchTokens = async (code) => {
             code_verifier: codeVerifier // PKCE code verifier
         });
 
-        // Add client secret for prod and test environments
+        // Add client secret for prod and test environments (confidential clients)
         if (EnvironmentVariables.environment_flag === 'prod') {
-            params.append('client_secret', '1kpm2jfmlh6aunhk07bd6qmovmfvjvdfahtq4m1fucsruv7p9mvv');
+            // TODO: Update with your actual production client secret for client ID: 13042d8nu2ed805be955pnhu0i
+            params.append('client_secret', '16dos5fdgqjoikl3hjig7tivlkjcmtp7ljhpsoho7dpth0keed29');
             console.log('🔍 fetchTokens: Added client secret for prod environment');
         } else if (EnvironmentVariables.environment_flag === 'test') {
-            // TODO: Replace with actual test client secret
-            params.append('client_secret', '338ljs5vkn841u2alf47shutdnfb4067eisgnnoifa6bvqgvbnp');
+            // TODO: Update with your actual test client secret
+            params.append('client_secret', '16dos5fdgqjoikl3hjig7tivlkjcmtp7ljhpsoho7dpth0keed29');
             console.log('🔍 fetchTokens: Added client secret for test environment');
         }
 

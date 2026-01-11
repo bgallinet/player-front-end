@@ -27,9 +27,27 @@ const generateCodeChallenge = async (verifier) => {
 
 // Prod environment configuration only
 const ClientID = '13042d8nu2ed805be955pnhu0i';
-const RedirectURI = 'https://soundbloom-player.com/callback';
+
+// Dynamically detect protocol and host for redirect URI (works for any domain)
+const getCurrentProtocol = () => {
+    if (typeof window !== 'undefined') {
+        return window.location.protocol; // 'http:' or 'https:'
+    }
+    return 'https:'; // Default to HTTPS for production
+};
+
+const getCurrentHost = () => {
+    if (typeof window !== 'undefined') {
+        return window.location.host; // 'soundbloom-player.com' or whatever
+    }
+    return 'soundbloom-player.com'; // Default fallback
+};
+
+// Build redirect URI dynamically based on current page
+const RedirectURI = `${getCurrentProtocol()}//${getCurrentHost()}/callback`;
 
 // AuthURL with PKCE for prod (confidential client) - WITHOUT empty code_challenge
+// Note: RedirectURI will be added dynamically in Auth.jsx with code_challenge
 const AuthURL = `https://d3o5hrtbl653it.auth.eu-west-3.amazoncognito.com/oauth2/authorize?client_id=${ClientID}&response_type=code&scope=email+openid&redirect_uri=${encodeURIComponent(RedirectURI)}&code_challenge_method=S256`;
 
 const CognitoURL = 'https://d3o5hrtbl653it.auth.eu-west-3.amazoncognito.com/oauth2/token';
