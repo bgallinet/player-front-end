@@ -22,6 +22,7 @@ import { fetchExperiment } from '../hooks/useExperiment';
 const SignUpButton = () => {
     const [showPricingOverlay, setShowPricingOverlay] = useState(false);
     const [showTermsOverlay, setShowTermsOverlay] = useState(false);
+    const [showThankYouOverlay, setShowThankYouOverlay] = useState(false);
     const [hasScrolledToBottom, setHasScrolledToBottom] = useState(false);
     const [experiment, setExperiment] = useState(null);
 
@@ -29,8 +30,8 @@ const SignUpButton = () => {
     const defaultConfig = {
         show_pricing: false,
         price_display: '',
-        title: 'Welcome to TuneTribes',
-        features: ['Real-time emotion detection', 'Interactive music requests', 'Live audience engagement']
+        title: 'Shape your music experience with the Crowd Sensor',
+        features: ['Adapt your favorite songs with your moves', 'Customize effects to your taste', 'Install application to use it in the background with any music source', 'Share with the audience your reactions in live streams']
     };
 
     const showPricing = experiment?.config?.show_pricing ?? defaultConfig.show_pricing;
@@ -47,7 +48,7 @@ const SignUpButton = () => {
                 'element_id': 'signup_button_click',
                 'page_url': window.location.href,
                 'session_name': getSessionNameFromUrl(),
-                ...(isDemoSession() && { 'user_name': 'demo_user_ye5e5p' })
+                ...(isDemoSession() && { 'user_name': getDemoUsername() })
             });
             AnalyticsAPI(analyticsData, !isDemoSession());
         } catch (error) {
@@ -99,6 +100,11 @@ const SignUpButton = () => {
 
     const handleProceedToSignUp = () => {
         setShowTermsOverlay(false);
+        setShowThankYouOverlay(true);
+    };
+
+    const handleThankYouClose = () => {
+        setShowThankYouOverlay(false);
         initiateLogin();
     };
 
@@ -150,7 +156,7 @@ const SignUpButton = () => {
     const pricingOverlayContent = (
         <>
             {/* Header */}
-            <div className="mb-4">
+            <div className="mb-4" style={{ paddingRight: '3rem' }}>
                 <h2 style={{ color: 'white', margin: 0, fontSize: '2rem' }}>
                     {title}
                 </h2>
@@ -167,27 +173,20 @@ const SignUpButton = () => {
 
             {/* Features */}
             <div className="mb-4">
-                <h3 style={{ color: 'white', fontSize: '1.2rem', marginBottom: '1rem' }}>
-                    App Features
-                </h3>
-                <ul style={{ color: 'white', paddingLeft: '1.5rem' }}>
-                    {features.map((feature, index) => (
-                        <li key={index} style={{ marginBottom: '0.5rem', fontSize: '1rem' }}>
-                            {feature}
-                        </li>
-                    ))}
-                </ul>
+                {features.map((feature, index) => (
+                    <div key={index} style={{ color: 'white', marginBottom: '0.5rem', fontSize: '1rem' }}>
+                        {feature}
+                    </div>
+                ))}
             </div>
 
             {/* Action Button */}
             <div className="mt-auto pt-4">
                 <Button
-                    variant="primary"
+                    variant="outline-light"
                     onClick={handleNextClick}
                     style={{
                         width: '100%',
-                        backgroundColor: secondaryColor,
-                        borderColor: secondaryColor,
                         fontSize: '1.1rem',
                         padding: '0.75rem'
                     }}
@@ -201,7 +200,7 @@ const SignUpButton = () => {
     const termsOverlayContent = (
         <>
                         {/* Header */}
-            <div className="mb-4">
+            <div className="mb-4" style={{ paddingRight: '3rem' }}>
                                 <Subtitle style={{ margin: 0, fontSize: '1.5rem' }}>
                     Privacy Notice & Terms of Use
                                 </Subtitle>
@@ -254,19 +253,15 @@ const SignUpButton = () => {
                         {/* Action Buttons */}
                         <div className="d-flex justify-content-between">
                             <Button
-                                variant="outline-secondary"
-                    onClick={() => setShowTermsOverlay(false)}
+                                variant="outline-light"
+                                onClick={() => setShowTermsOverlay(false)}
                             >
                                 Cancel
                             </Button>
                             <Button
-                                variant="primary"
+                                variant="outline-light"
                                 onClick={handleProceedToSignUp}
                                 disabled={!hasScrolledToBottom}
-                                style={{
-                                    backgroundColor: hasScrolledToBottom ? secondaryColor : '#666',
-                                    borderColor: hasScrolledToBottom ? secondaryColor : '#666'
-                                }}
                             >
                                 I Agree - Continue to Sign Up
                             </Button>
@@ -280,6 +275,39 @@ const SignUpButton = () => {
                                 </Text>
                             </div>
                         )}
+        </>
+    );
+
+    const thankYouOverlayContent = (
+        <>
+            {/* Header */}
+            <div className="mb-4" style={{ paddingRight: '3rem' }}>
+                <h2 style={{ color: 'white', margin: 0, fontSize: '2rem' }}>
+                    Thank you so much for your interest !
+                </h2>
+            </div>
+
+            {/* Message */}
+            <div className="mb-4">
+                <Text style={{ color: 'white', fontSize: '1rem', lineHeight: '1.6' }}>
+                    We are so happy and honored that you wish to sign up. The application is still under development, and our subscription terms and fees may change on release. If you sign up now, we will keep you posted when the app is ready, and make a gesture that early supporters deserve ;-)
+                </Text>
+            </div>
+
+            {/* Action Button */}
+            <div className="mt-auto pt-4">
+                <Button
+                    variant="outline-light"
+                    onClick={handleThankYouClose}
+                    style={{
+                        width: '100%',
+                        fontSize: '1.1rem',
+                        padding: '0.75rem'
+                    }}
+                >
+                    Continue to Sign Up
+                </Button>
+            </div>
         </>
     );
 
@@ -305,6 +333,13 @@ const SignUpButton = () => {
                 termsOverlayContent,
                 true,
                 () => setShowTermsOverlay(false)
+            )}
+
+            {/* Thank You Overlay */}
+            {showThankYouOverlay && renderOverlay(
+                thankYouOverlayContent,
+                true,
+                handleThankYouClose
             )}
         </>
     );
