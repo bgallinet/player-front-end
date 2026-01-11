@@ -1,12 +1,13 @@
-const API_gateway_url = "https://6xwmsk1gm1.execute-api.eu-west-3.amazonaws.com/crowd-sensor-test-stage-pqj441zt"; // To be changed
+// API Gateway URL - using custom domain for stable endpoint
+const API_gateway_url = "https://9ic2sonafk.execute-api.eu-west-3.amazonaws.com/player-test-stage-yf4kl6vh";
 
-const environment_flag = "test"
+// WebSocket URLs (without protocol - will be auto-detected based on page protocol)
+const WebSocketURL = "ws-player-test.crowd-sensor.com"; // Domain endpoint (HTTPS pages → wss://)
+const WebSocketTestURL = "player-test-websocket-alb-620473978.eu-west-3.elb.amazonaws.com"; // ALB direct URL (HTTP pages → ws://)
 
-// WebSocket URLs
-const WebSocketURL = "ws-test.crowd-sensor.com"; // Domain endpoint (HTTPS pages → wss://)
-const WebSocketTestURL = "crowd-sensor-test-websocket-alb-293139646.eu-west-3.elb.amazonaws.com"; // ALB direct URL (HTTP pages → ws://)
+const environment_flag = "prod"
 
-// PKCE helper functions for prod and test environments
+// PKCE helper functions for prod environment
 const generateCodeVerifier = () => {
     const array = new Uint8Array(32);
     crypto.getRandomValues(array);
@@ -24,14 +25,15 @@ const generateCodeChallenge = async (verifier) => {
         .replace(/=/g, '');
 };
 
-// Test environment configuration
-const ClientID = '48mbuimag81pc52odtsight2g5';
-const RedirectURI = 'https://test.d22r3tk88qmw9i.amplifyapp.com/callback';
+// Prod environment configuration only
+const ClientID = '13042d8nu2ed805be955pnhu0i';
+const RedirectURI = 'https://soundbloom-player.com/callback';
 
-// AuthURL with PKCE for test (confidential client) - WITHOUT empty code_challenge
+// AuthURL with PKCE for prod (confidential client) - WITHOUT empty code_challenge
 const AuthURL = `https://d3o5hrtbl653it.auth.eu-west-3.amazoncognito.com/oauth2/authorize?client_id=${ClientID}&response_type=code&scope=email+openid&redirect_uri=${encodeURIComponent(RedirectURI)}&code_challenge_method=S256`;
 
-const CognitoURL = 'https://d3o5hrtbl653it.auth.eu-west-3.amazoncognito.com/oauth2/token'
+const CognitoURL = 'https://d3o5hrtbl653it.auth.eu-west-3.amazoncognito.com/oauth2/token';
+
 
 const EnvironmentVariables = {
     AuthURL: AuthURL,
@@ -52,4 +54,4 @@ export default EnvironmentVariables;
 
 // Export individual values for convenience
 export const AnalyticsAPI_URL = EnvironmentVariables.AnalyticsAPI_URL;
-export { WebSocketURL, WebSocketTestURL };
+export { WebSocketURL, WebSocketTestURL }; // Re-export WebSocket URLs
