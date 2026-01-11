@@ -68,6 +68,7 @@ const ManualMapping = ({
         { key: 'nodding+happy', label: 'Nodding + Smiling', icon: '' },
         { key: 'nodding+surprised', label: 'Nodding + Surprised', icon: '' },
         { key: 'nodding+neutral', label: 'Nodding + Neutral', icon: '' },
+        { key: 'handsRaised', label: 'Hands Raised', icon: '' },
         { key: 'happy', label: 'Smiling', icon: '' },
         { key: 'surprised', label: 'Surprised', icon: '' },
         { key: 'neutral', label: 'Neutral', icon: '' }

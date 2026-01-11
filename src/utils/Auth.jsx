@@ -1,6 +1,6 @@
 import EnvironmentVariables from './EnvironmentVariables';
 
-// PKCE helper functions for prod environment
+// PKCE helper functions for prod and test environments
 const generateCodeVerifier = () => {
     const array = new Uint8Array(32);
     crypto.getRandomValues(array);
@@ -18,24 +18,24 @@ const generateCodeChallenge = async (verifier) => {
         .replace(/=/g, '');
 };
 
-// Generate PKCE challenge and redirect to Cognito (PROD ONLY)
+// Generate PKCE challenge and redirect to Cognito (PROD and TEST)
 export const initiateLogin = async () => {
     try {
         console.log('🔍 initiateLogin called');
         console.log('🔍 Environment flag:', EnvironmentVariables.environment_flag);
         console.log('🔍 Base AuthURL:', EnvironmentVariables.AuthURL);
         
-        // Check if we're in prod environment
-        if (EnvironmentVariables.environment_flag !== 'prod') {
-            console.log('🔍 Non-prod environment, using simple redirect');
-            // For non-prod environments, use simple redirect
+        // Check if we're in prod or test environment (both use PKCE with client secret)
+        if (EnvironmentVariables.environment_flag !== 'prod' && EnvironmentVariables.environment_flag !== 'test') {
+            console.log('🔍 Non-prod/test environment, using simple redirect');
+            // For non-prod/test environments, use simple redirect
             window.location.href = EnvironmentVariables.AuthURL;
             return;
         }
 
-        console.log('🔍 PROD environment detected, generating PKCE');
+        console.log(`🔍 ${EnvironmentVariables.environment_flag.toUpperCase()} environment detected, generating PKCE`);
         
-        // PROD: Generate PKCE code verifier and challenge
+        // PROD/TEST: Generate PKCE code verifier and challenge
         const codeVerifier = generateCodeVerifier();
         console.log('🔍 Code verifier generated:', codeVerifier);
         
@@ -100,9 +100,9 @@ export const fetchTokens = async (code) => {
     }
 
     try {
-        // Check if we're in prod environment
-        if (EnvironmentVariables.environment_flag !== 'prod') {
-            // For non-prod environments, use simple token exchange
+        // Check if we're in prod or test environment (both use PKCE with client secret)
+        if (EnvironmentVariables.environment_flag !== 'prod' && EnvironmentVariables.environment_flag !== 'test') {
+            // For non-prod/test environments, use simple token exchange
             const params = new URLSearchParams({
                 grant_type: 'authorization_code',
                 client_id: EnvironmentVariables.ClientID,
@@ -156,7 +156,7 @@ export const fetchTokens = async (code) => {
             throw new Error('Code verifier not found. Please try logging in again.');
         }
 
-        // Build params for prod environment (with client secret)
+        // Build params for prod/test environment (with client secret)
         const params = new URLSearchParams({
             grant_type: 'authorization_code',
             client_id: EnvironmentVariables.ClientID,
@@ -165,10 +165,14 @@ export const fetchTokens = async (code) => {
             code_verifier: codeVerifier // PKCE code verifier
         });
 
-        // Add client secret only for prod environment
+        // Add client secret for prod and test environments
         if (EnvironmentVariables.environment_flag === 'prod') {
             params.append('client_secret', '1kpm2jfmlh6aunhk07bd6qmovmfvjvdfahtq4m1fucsruv7p9mvv');
             console.log('🔍 fetchTokens: Added client secret for prod environment');
+        } else if (EnvironmentVariables.environment_flag === 'test') {
+            // TODO: Replace with actual test client secret
+            params.append('client_secret', '338ljs5vkn841u2alf47shutdnfb4067eisgnnoifa6bvqgvbnp');
+            console.log('🔍 fetchTokens: Added client secret for test environment');
         }
 
         console.log('🔍 fetchTokens: Final params for token exchange:', params.toString());
@@ -222,8 +226,8 @@ export const fetchTokens = async (code) => {
 
     } catch (error) {
         console.error('Error fetching tokens:', error);
-        // Clean up code verifier from sessionStorage on error (PROD only)
-        if (EnvironmentVariables.environment_flag === 'prod') {
+        // Clean up code verifier from sessionStorage on error (PROD/TEST only)
+        if (EnvironmentVariables.environment_flag === 'prod' || EnvironmentVariables.environment_flag === 'test') {
             sessionStorage.removeItem('code_verifier');
         }
         return null;

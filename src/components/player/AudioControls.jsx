@@ -1,6 +1,7 @@
 import React from 'react';
 import { Text } from '../../utils/StyledComponents';
 import { secondaryColor } from '../../utils/DisplaySettings';
+import { Dropdown } from 'react-bootstrap';
 import AudioDeviceButton from '../../utils/AudioDeviceButton';
 import SettingsButton from '../../utils/SettingsButton';
 import TutorialButton from '../../utils/TutorialButton';
@@ -24,6 +25,10 @@ const AudioControls = ({
     onProgressClick,
     onAudioDeviceClick,
     onEmotionMappingClick,
+    
+    // Detection mode
+    detectionMode = 'landmark',
+    onDetectionModeChange,
     
     // Tutorial state
     tutorialDismissed,
@@ -65,6 +70,42 @@ const AudioControls = ({
                         tooltipText="Previous"
                         isEnabled={hasPrevious}
                     />
+                )}
+                
+                {/* Detection Mode Switcher */}
+                {onDetectionModeChange && (
+                    <Dropdown>
+                        <Dropdown.Toggle 
+                            variant="outline-light"
+                            size="sm"
+                            style={{ 
+                                fontSize: '0.8rem', 
+                                whiteSpace: 'nowrap', 
+                                height: '2.5rem', 
+                                minWidth: '6rem',
+                                boxShadow: 'none',
+                                border: '1px solid rgba(255, 255, 255, 0.3)',
+                                background: 'transparent',
+                                color: 'white'
+                            }}
+                        >
+                            {detectionMode === 'landmark' ? '👤 Face' : '🤸 Body'}
+                        </Dropdown.Toggle>
+                        <Dropdown.Menu>
+                            <Dropdown.Item 
+                                onClick={() => onDetectionModeChange('landmark')}
+                                active={detectionMode === 'landmark'}
+                            >
+                                👤 Face Mode
+                            </Dropdown.Item>
+                            <Dropdown.Item 
+                                onClick={() => onDetectionModeChange('body')}
+                                active={detectionMode === 'body'}
+                            >
+                                🤸 Body Mode
+                            </Dropdown.Item>
+                        </Dropdown.Menu>
+                    </Dropdown>
                 )}
                 
                 {/* Play/Pause Button */}
