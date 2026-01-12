@@ -4,7 +4,6 @@ import { Subtitle } from '../utils/StyledComponents';
 import Player from '../components/player/Player';
 import TrackChoice from '../components/player/TrackChoice';
 import EvaluationForm from '../components/EvaluationForm';
-import LargeTutorialButton from '../utils/LargeTutorialButton';
 import SignUpButton from '../utils/SignUpButton';
 import { useAuth } from '../contexts/AuthContext';
 import { useTutorial } from '../contexts/TutorialContext';
@@ -154,19 +153,9 @@ const DemoPlayerPage = () => {
                 </div>
             )}
 
-            {/* Tutorial, Feedback, and Sign Up Buttons */}
+            {/* Feedback and Sign Up Buttons */}
             <div className="text-center mb-4">
                 <div className="d-flex justify-content-center gap-2 flex-wrap">
-                    <LargeTutorialButton 
-                        style={{
-                            padding: '0.75rem 1.5rem',
-                            fontSize: '1rem',
-                            whiteSpace: 'nowrap',
-                            minWidth: 'fit-content',
-                            textOverflow: 'unset',
-                            overflow: 'visible'
-                        }}
-                    />
                     <Button
                         variant="outline-light"
                         onClick={handleFeedbackClick}
