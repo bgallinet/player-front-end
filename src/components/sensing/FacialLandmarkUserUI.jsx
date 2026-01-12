@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Row, Col, Button } from 'react-bootstrap';
+import { Button } from 'react-bootstrap';
 import AnalyticsAPI from '../../utils/AnalyticsAPI.jsx';
 import { scanFrequencyLandmark } from '../../utils/DisplaySettings.jsx';
 import { getSessionNameFromUrl } from '../../hooks/sessionUtils.js';
@@ -14,12 +14,6 @@ import { DATA_COLLECTION_WINDOW } from '../../hooks/ReactionMapperConfig';
 import PlayPauseButton from '../../utils/PlayPauseButton.jsx';
 import LandmarkWebSocket from '../../hooks/LandmarkWebSocket';
 
-// Import animated reactions
-import happyFaceAnim from '../../gif/happy_set3_100px.gif';
-import surprisedFaceAnim from '../../gif/surprised_set3_100px.gif';
-import noddingFaceAnim from '../../gif/nodding_set3_100px.gif';
-
-const reactionImageSize = '4rem';
 
 // Environment detection for production optimization
 const isProduction = process.env.NODE_ENV === 'production';
@@ -1064,40 +1058,79 @@ const FacialLandmarkUserUI = ({
     //////////////////////////////////// RENDER ////////////////////////////////////
 
     return (
-        <Row className="mb-4">
-            <Col>
-                <div className="d-flex flex-column align-items-center">
-                    <div 
-                        className={`${embeddingTW ? "twitch-embed-page" : ""}`}
-                        style={{
-                            position: 'fixed',
-                            bottom: 0,
-                            left: 0,
-                            right: 0,
-                            backgroundColor: '#000',
-                            zIndex: 1000,
-                            padding: window.innerWidth < 768 ? '0.5rem' : '1rem',
-                            paddingBottom: embeddingTW 
-                                ? `max(0.5rem, calc(0.5rem + var(--safe-area-bottom) + 8px))` 
-                                : `max(0.5rem, calc(0.5rem + var(--safe-area-bottom)))`,
-                            borderTop: '1px solid rgba(255, 255, 255, 0.1)',
-                            minHeight: window.innerWidth < 768 ? 'max(8rem, calc(8rem + var(--safe-area-bottom)))' : 
-                                      sizeMode === 'large' ? 'max(12rem, calc(12rem + var(--safe-area-bottom)))' : 'auto',
-                            maxHeight: window.innerWidth < 768 ? 'max(10rem, calc(10rem + var(--safe-area-bottom)))' : 
-                                      sizeMode === 'large' ? 'max(16rem, calc(16rem + var(--safe-area-bottom)))' : 'auto',
-                            ...(embeddingTW && {
-                                isolation: 'isolate',
-                                contain: 'layout style',
-                                willChange: 'transform'
-                            })
-                        }}
-                    >
-                            <div className="d-flex align-items-center justify-content-between gap-3">
+        <div style={{ width: '100%', marginBottom: '1rem', display: 'block' }}>
+            <div 
+                className={`${embeddingTW ? "twitch-embed-page" : ""}`}
+                style={{
+                    backgroundColor: '#000',
+                    padding: window.innerWidth < 768 ? '0.5rem' : '1rem',
+                    paddingBottom: embeddingTW 
+                        ? `max(0.5rem, calc(0.5rem + var(--safe-area-bottom) + 8px))` 
+                        : `max(0.5rem, calc(0.5rem + var(--safe-area-bottom)))`,
+                    borderRadius: '0.5rem',
+                    width: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    ...(embeddingTW && {
+                        isolation: 'isolate',
+                        contain: 'layout style',
+                        willChange: 'transform'
+                    })
+                }}
+            >
+                            <div className="d-flex flex-column align-items-center gap-2">
+                                {/* Start detection button and text */}
+                                <div className="d-flex align-items-center justify-content-center gap-2">
+                                    <PlayPauseButton
+                                        onClick={handleLandmarkDetection}
+                                        isPlaying={scan}
+                                        size={window.innerWidth < 768 ? '3.2rem' : '4rem'}
+                                        isEnabled={isModelLoaded && detectorInitialized && !modelError && (localStorage.getItem('idToken') || is_demo_session)}
+                                        style={{
+                                            width: window.innerWidth < 768 ? '3.2rem' : '4rem',
+                                            height: window.innerWidth < 768 ? '3.2rem' : '4rem'
+                                        }}
+                                    />
+                                    {scan && (
+                                        <div style={{
+                                            width: window.innerWidth < 768 ? '1rem' : '1.2rem',
+                                            height: window.innerWidth < 768 ? '1rem' : '1.2rem',
+                                            borderRadius: '50%',
+                                            border: '0.2rem solid white',
+                                            backgroundColor: faceVisible === 'true' ? '#4CAF50' : '#FF0000'
+                                        }} />
+                                    )}
+                                    {!scan ? (
+                                        <p style={{ 
+                                            textAlign: 'left', 
+                                            margin: 0, 
+                                            fontSize: window.innerWidth < 768 ? '0.8rem' : '1rem',
+                                            lineHeight: '1.2',
+                                            color: 'white'
+                                        }}>
+                                            {modelError ? 'Model Error' : 
+                                             !isModelLoaded ? 'Loading model...' :
+                                             !detectorInitialized ? 'Loading video...' :
+                                             !is_demo_session && !localStorage.getItem('idToken') 
+                                                ? 'Login needed'
+                                                : 'Start detection'}
+                                        </p>
+                                    ) : (
+                                        <p style={{ 
+                                            textAlign: 'left', 
+                                            margin: 0, 
+                                            fontSize: window.innerWidth < 768 ? '0.8rem' : '1rem',
+                                            lineHeight: '1.2',
+                                            color: 'white'
+                                        }}>
+                                            {faceVisible === 'true' ? 'Detecting' : 'Searching...'}
+                                        </p>
+                                    )}
+                                </div>
+
                                 {/* Webcam container */}
-                                <div className="d-flex justify-content-center" style={{
-                                    // Move camera up in large mode on smartphone
-                                    marginTop: (window.innerWidth < 768 && sizeMode === 'large') ? '-1rem' : '0'
-                                }}>
+                                <div className="d-flex justify-content-center">
                                     {/* Hidden camera for landmark detection */}
                                     <OrientedCamera 
                                         stream={stream}
@@ -1140,256 +1173,26 @@ const FacialLandmarkUserUI = ({
                                         />
                                     </div>
                                 </div>
-
-                                {/* Status indicators - Center */}
-                                <div className={`d-flex ${window.innerWidth < 768 ? 'flex-column' : 'flex-row'} align-items-center gap-0`} style={{ flex: 1 }}>
-                                    <div className={`d-flex gap-2 align-items-center justify-content-start ${window.innerWidth < 768 ? 'mb-2' : ''}`} style={{ width: '100%' }}>
-                                        <PlayPauseButton
-                                            onClick={handleLandmarkDetection}
-                                            isPlaying={scan}
-                                            size={window.innerWidth < 768 ? '3.2rem' : '4rem'}
-                                            isEnabled={isModelLoaded && detectorInitialized && !modelError && (localStorage.getItem('idToken') || is_demo_session)}
-                                            style={{
-                                                width: window.innerWidth < 768 ? '3.2rem' : '4rem',
-                                                height: window.innerWidth < 768 ? '3.2rem' : '4rem'
-                                            }}
-                                        />
-                                        {scan && (
-                                            <div style={{
-                                                width: window.innerWidth < 768 ? '1rem' : '1.2rem',
-                                                height: window.innerWidth < 768 ? '1rem' : '1.2rem',
-                                                borderRadius: '50%',
-                                                border: '0.2rem solid white',
-                                                backgroundColor: faceVisible === 'true' ? '#4CAF50' : '#FF0000'
-                                            }} />
-                                        )}
-                                        {!scan ? (
-                                            <p style={{ 
-                                                textAlign: 'left', 
-                                                margin: 0, 
-                                                fontSize: window.innerWidth < 768 ? '0.5rem' : '0.6rem',
-                                                lineHeight: '1.2'
-                                            }}>
-                                                {modelError ? 'Model Error' : 
-                                                 !isModelLoaded ? 'Loading model...' :
-                                                 !detectorInitialized ? 'Loading video...' :
-                                                 !is_demo_session && !localStorage.getItem('idToken') 
-                                                    ? 'Login needed'
-                                                    : 'Capture face movements'}
-                                            </p>
-                                        ) : (
-                                            faceVisible === 'true' ? (
-                                                <span style={{ fontSize: window.innerWidth < 768 ? '0.6rem' : '0.7rem' }}>Face visible</span>
-                                            ) : (
-                                                <div className="spinner-border spinner-border-sm text-light" role="status" style={{ 
-                                                    width: window.innerWidth < 768 ? '0.6rem' : '0.8rem', 
-                                                    height: window.innerWidth < 768 ? '0.6rem' : '0.8rem' 
-                                                }}>
-                                                    <span className="visually-hidden">Loading...</span>
-                                                </div>
-                                            )
-                                        )}
-                                    </div>
                                     
-                                    {/* Face reactions from blendshapes - responsive layout */}
-                                    <div className={`d-flex ${window.innerWidth < 768 ? 'flex-column' : 'gap-0 justify-content-start'} ${sizeMode === 'large' ? 'flex-column' : 'align-items-center'} ${window.innerWidth < 768 ? 'align-items-start' : ''}`} style={{ width: '100%', gap: window.innerWidth < 768 ? '0.25rem' : undefined }}>
-                                        {/* Mobile: All indicators in one row */}
-                                        {window.innerWidth < 768 ? (
-                                            <div className="d-flex gap-1 justify-content-start align-items-center">
-                                        {/* Smiling indicator */}
-                                        <div className="d-flex align-items-center gap-0">
-                                            <img 
-                                                src={happyFaceAnim} 
-                                                alt="Smiling" 
-                                                style={{ 
-                                                            width: '2.5rem', 
-                                                            height: '2.5rem' 
-                                                }} 
-                                            />
-                                            <div style={{
-                                                        width: '1.4rem',
-                                                        height: '1.4rem',
-                                                borderRadius: '50%',
-                                                border: '0.1rem solid white',
-                                                backgroundColor: (scan && smilingIntensity > thresholdForVisualizationOfSmiling) ? '#4CAF50' : 'transparent'
-                                            }} />
-                                        </div>
-                                        
-                                        {/* Jaw open indicator */}
-                                        <div className="d-flex align-items-center gap-0">
-                                            <img 
-                                                src={surprisedFaceAnim} 
-                                                alt="Jaw Open" 
-                                                style={{ 
-                                                            width: '2.5rem', 
-                                                            height: '2.5rem' 
-                                                }} 
-                                            />
-                                            <div style={{
-                                                        width: '1.4rem',
-                                                        height: '1.4rem',
-                                                borderRadius: '50%',
-                                                border: '0.1rem solid white',
-                                                backgroundColor: (scan && jawOpenIntensity > thresholdForVisualizationOfJawOpen) ? '#4CAF50' : 'transparent'
-                                            }} />
-                                        </div>
-                                        
-                                        {/* Nodding indicator */}
-                                        <div className="d-flex align-items-center gap-0">
-                                            <img 
-                                                src={noddingFaceAnim} 
-                                                alt="Nodding" 
-                                                style={{ 
-                                                            width: '2.5rem', 
-                                                            height: '2.5rem' 
-                                                        }} 
-                                                    />
-                                                    <div className="d-flex flex-column" style={{ minWidth: '60px' }}>
-                                                        {scan ? (
-                                                            faceVisible === 'true' ? (
-                                                                <p className="mb-1" style={{ fontSize: '0.4rem' }}>
-                                                                    {(() => {
-                                                                        const bpm = Math.round(noddingFrequency * 60);
-                                                                        return noddingAmplitude > thresholdForVisualizationOfNodding ? ` @ ${bpm} bpm` : 'Nodding';
-                                                                    })()}
-                                                                </p>
-                                                            ) : (
-                                                                <p className="mb-1" style={{ fontSize: '0.4rem' }}>
-                                                                    Nodding
-                                                                </p>
-                                                            )
-                                                        ) : (
-                                                            <p className="mb-1" style={{ fontSize: '0.4rem' }}>
-                                                                Nodding
-                                                            </p>
-                                                        )}
-                                                        <div className="d-flex align-items-center">
-                                                            <div style={{ 
-                                                                width: '30px',
-                                                                height: '12px',
-                                                                border: '2px solid white',
-                                                                position: 'relative'
-                                                            }}>
-                                                                <div style={{ 
-                                                                    position: 'absolute',
-                                                                    left: 0,
-                                                                    top: 0,
-                                                                    height: '100%',
-                                                                    width: scan ? (() => {
-                                                                        const widthPercent = Math.min(100, (noddingAmplitude)/(thresholdForVisualizationOfNodding*2)*100);
-                                                                        return `${widthPercent}%`;
-                                                                    })() : '0%',
-                                                                    backgroundColor: scan ? (noddingAmplitude > thresholdForVisualizationOfNodding ? '#4CAF50' : 'white') : 'transparent'
-                                                                }}/>
-                                        </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        ) : (
-                                            /* Desktop: Original layout */
-                                            <>
-                                                {/* Smiling and Jaw Open indicators - top row */}
-                                                <div className="d-flex gap-0 justify-content-start align-items-center">
-                                                    {/* Smiling indicator */}
-                                                    <div className="d-flex align-items-center gap-0">
-                                                        <img 
-                                                            src={happyFaceAnim} 
-                                                            alt="Smiling" 
-                                                            style={{ 
-                                                                width: reactionImageSize, 
-                                                                height: reactionImageSize 
-                                                            }} 
-                                                        />
-                                                        <div style={{
-                                                            width: '1.8rem',
-                                                            height: '1.8rem',
-                                                            borderRadius: '50%',
-                                                            border: '0.1rem solid white',
-                                                            backgroundColor: (scan && smilingIntensity > thresholdForVisualizationOfSmiling) ? '#4CAF50' : 'transparent'
-                                                        }} />
-                                                    </div>
-                                                    
-                                                    {/* Jaw open indicator */}
-                                                    <div className="d-flex align-items-center gap-0">
-                                                        <img 
-                                                            src={surprisedFaceAnim} 
-                                                            alt="Jaw Open" 
-                                                            style={{ 
-                                                                width: reactionImageSize, 
-                                                                height: reactionImageSize 
-                                                            }} 
-                                                        />
-                                                        <div style={{
-                                                            width: '1.8rem',
-                                                            height: '1.8rem',
-                                                            borderRadius: '50%',
-                                                            border: '0.1rem solid white',
-                                                            backgroundColor: (scan && jawOpenIntensity > thresholdForVisualizationOfJawOpen) ? '#4CAF50' : 'transparent'
-                                                        }} />
-                                                    </div>
-                                                </div>
-                                                
-                                                {/* Nodding indicator - bottom row when large mode */}
-                                                <div className={`d-flex align-items-center gap-0 ${sizeMode === 'large' ? 'mt-2' : ''}`}>
-                                                    <img 
-                                                        src={noddingFaceAnim} 
-                                                        alt="Nodding" 
-                                                        style={{ 
-                                                            width: reactionImageSize, 
-                                                            height: reactionImageSize 
-                                                        }} 
-                                                    />
-                                                    <div className="d-flex flex-column" style={{ minWidth: '80px' }}>
-                                            {scan ? (
-                                                faceVisible === 'true' ? (
-                                                                <p className="mb-1" style={{ fontSize: '0.5rem' }}>
-                                                        {(() => {
-                                                            const bpm = Math.round(noddingFrequency * 60);
-                                                            return noddingAmplitude > thresholdForVisualizationOfNodding ? ` @ ${bpm} bpm` : 'Nodding';
-                                                        })()}
-                                                    </p>
-                                                ) : (
-                                                                <p className="mb-1" style={{ fontSize: '0.5rem' }}>
-                                                        Nodding
-                                                    </p>
-                                                )
-                                            ) : (
-                                                            <p className="mb-1" style={{ fontSize: '0.5rem' }}>
-                                                    Nodding
-                                                </p>
-                                            )}
-                                            <div className="d-flex align-items-center">
-                                                <div style={{ 
-                                                                width: '40px',
-                                                                height: '16px',
-                                                    border: '2px solid white',
-                                                    position: 'relative'
-                                                }}>
-                                                    <div style={{ 
-                                                        position: 'absolute',
-                                                        left: 0,
-                                                        top: 0,
-                                                        height: '100%',
-                                                        width: scan ? (() => {
-                                                            const widthPercent = Math.min(100, (noddingAmplitude)/(thresholdForVisualizationOfNodding*2)*100);
-                                                            return `${widthPercent}%`;
-                                                        })() : '0%',
-                                                        backgroundColor: scan ? (noddingAmplitude > thresholdForVisualizationOfNodding ? '#4CAF50' : 'white') : 'transparent'
-                                                    }}/>
-                                                </div>
-                                            </div>
-                                        </div>
-                                                </div>
-                                            </>
-                                        )}
-                                    </div>
+                                {/* Nodding indicator with BPM */}
+                                <div className="d-flex align-items-center justify-content-center">
+                                    <p style={{ 
+                                        margin: 0, 
+                                        fontSize: window.innerWidth < 768 ? '0.7rem' : '0.9rem',
+                                        color: 'white',
+                                        fontFamily: 'monospace'
+                                    }}>
+                                        {(() => {
+                                            const bpm = scan && faceVisible === 'true' && noddingAmplitude > thresholdForVisualizationOfNodding 
+                                                ? Math.round(noddingFrequency * 60).toString().padStart(3, '0')
+                                                : '000';
+                                            return `Nodding ${bpm} bpm`;
+                                        })()}
+                                    </p>
                                 </div>
-                            </div>
-                        </div>
-                    </div>
-            </Col>
-        </Row>
+                                </div>
+            </div>
+        </div>
     );
 };
 

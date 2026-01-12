@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Button } from 'react-bootstrap';
 import { useTutorial } from '../contexts/TutorialContext';
-import { secondaryColor } from '../utils/DisplaySettings';
 import tutorialIcon from '../images/tutorialicon.png';
+import TypewriterText from '../utils/TypewriterText';
 
 const TutorialMessage = ({ messages, position = 'top-center', onClose }) => {
     const { isTutorialMode, disableTutorialMode } = useTutorial();
@@ -50,9 +50,10 @@ const TutorialMessage = ({ messages, position = 'top-center', onClose }) => {
                 color: 'white',
                 padding: '1rem',
                 borderRadius: '0.5rem',
-                border: `2px solid ${secondaryColor}`,
-                boxShadow: `0 0 1rem ${secondaryColor}40`,
-                maxWidth: '300px',
+                border: `2px solid white`,
+                boxShadow: `0 0 1rem rgba(255, 255, 255, 0.4)`,
+                width: '300px',
+                minWidth: '300px',
                 zIndex: 2000,
                 fontSize: '0.9rem',
                 lineHeight: '1.4'
@@ -68,8 +69,22 @@ const TutorialMessage = ({ messages, position = 'top-center', onClose }) => {
                     }} 
                 />
             </div>
-            <div style={{ marginBottom: '1rem' }}>
-                {currentMessage}
+            <div style={{ marginBottom: '1rem', minHeight: '120px' }}>
+                <TypewriterText 
+                    text={currentMessage}
+                    speed={20}
+                    delay={100}
+                    style={{
+                        color: 'white',
+                        fontSize: '0.9rem',
+                        fontWeight: 'normal',
+                        fontFamily: 'inherit',
+                        minHeight: '120px',
+                        display: 'block',
+                        textAlign: 'left',
+                        lineHeight: '1.4'
+                    }}
+                />
             </div>
             {messageArray.length > 1 && (
                 <div style={{ 

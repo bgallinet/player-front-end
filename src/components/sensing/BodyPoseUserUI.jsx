@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Row, Col, Button } from 'react-bootstrap';
+import { Button } from 'react-bootstrap';
 import AnalyticsAPI from '../../utils/AnalyticsAPI.jsx';
 import { scanFrequencyPose, noddingAnalysisWindow, secondaryColor } from '../../utils/DisplaySettings';
 import { getSessionNameFromUrl } from '../../hooks/sessionUtils';
@@ -753,168 +753,124 @@ const BodyPoseUserUI = ({
     //////////////////////////////////// RENDER ////////////////////////////////////
 
     return (
-        <Row className="mb-4">
-            <Col>
-                <div className="d-flex flex-column align-items-center">
-                    <div className="d-flex flex-column align-items-center" style={{ width: '200px' }}>
-                        <div 
-                            className={embeddingTW ? "twitch-embed-page" : ""}
+        <div style={{ width: '100%', marginBottom: '1rem', display: 'block' }}>
+            <div 
+                className={`${embeddingTW ? "twitch-embed-page" : ""}`}
+                style={{
+                    backgroundColor: '#000',
+                    padding: window.innerWidth < 768 ? '0.5rem' : '1rem',
+                    paddingBottom: embeddingTW 
+                        ? `max(0.5rem, calc(0.5rem + var(--safe-area-bottom) + 8px))` 
+                        : `max(0.5rem, calc(0.5rem + var(--safe-area-bottom)))`,
+                    borderRadius: '0.5rem',
+                    width: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    ...(embeddingTW && {
+                        isolation: 'isolate',
+                        contain: 'layout style',
+                        willChange: 'transform'
+                    })
+                }}
+            >
+                <div className="d-flex flex-column align-items-center gap-2">
+                    {/* Start detection button and text */}
+                    <div className="d-flex align-items-center justify-content-center gap-2">
+                        <PlayPauseButton
+                            onClick={handlePoseDetection}
+                            isPlaying={scan}
+                            size={window.innerWidth < 768 ? '3.2rem' : '4rem'}
+                            isEnabled={isModelLoaded && detectorInitialized && !modelError && (localStorage.getItem('idToken') || is_demo_session)}
                             style={{
-                                position: 'fixed',
-                                bottom: 0,
-                                left: 0,
-                                right: 0,
-                                backgroundColor: '#000',
-                                zIndex: 1000,
-                                padding: window.innerWidth < 768 ? '0.5rem' : '1rem',
-                                paddingBottom: embeddingTW 
-                                    ? `max(0.5rem, calc(0.5rem + var(--safe-area-bottom) + 8px))` 
-                                    : `max(0.5rem, calc(0.5rem + var(--safe-area-bottom)))`,
-                                borderTop: '1px solid rgba(255, 255, 255, 0.1)',
-                                minHeight: window.innerWidth < 768 ? 'max(8rem, calc(8rem + var(--safe-area-bottom)))' : 
-                                          sizeMode === 'large' ? 'max(12rem, calc(12rem + var(--safe-area-bottom)))' : 'auto',
-                                maxHeight: window.innerWidth < 768 ? 'max(10rem, calc(10rem + var(--safe-area-bottom)))' : 
-                                          sizeMode === 'large' ? 'max(16rem, calc(16rem + var(--safe-area-bottom)))' : 'auto',
-                                transform: window.innerWidth < 768 ? 'translateY(0)' : 'none',
-                                ...(embeddingTW && {
-                                    isolation: 'isolate',
-                                    contain: 'layout style',
-                                    willChange: 'transform'
-                                })
+                                width: window.innerWidth < 768 ? '3.2rem' : '4rem',
+                                height: window.innerWidth < 768 ? '3.2rem' : '4rem'
                             }}
-                        >
-                            <div className="d-flex align-items-center justify-content-between gap-3">
-                                {/* Webcam container - Left side */}
-                                <div className="d-flex justify-content-center" style={{
-                                    // Move camera up in large mode on smartphone
-                                    marginTop: (window.innerWidth < 768 && sizeMode === 'large') ? '-1rem' : '0'
-                                }}>
-                                    {/* Hidden camera for pose detection */}
-                                    <OrientedCamera 
-                                        stream={stream}
-                                        onVideoRef={(videoElement) => {
-                                            videoRef.current = videoElement;
-                                        }}
-                                        style={{ 
-                                            position: 'absolute',
-                                            width: cameraSize,
-                                            height: cameraSize,
-                                            opacity: 0, // Hide the camera image
-                                            pointerEvents: 'none'
-                                        }}
-                                        objectPosition={window.innerWidth < 768 ? 'center 85%' : 'center'}
-                                    />
-                                    
-                                    {/* Canvas for pose landmarks with white frame */}
-                                    <div style={{
-                                        position: 'relative',
-                                        width: cameraSize,
-                                        height: cameraSize,
-                                        border: '2px solid white',
-                                        borderRadius: '8px',
-                                        backgroundColor: 'transparent',
-                                        overflow: 'hidden'
-                                    }}>
-                                        <canvas
-                                            ref={canvasRef}
-                                            style={{
-                                                position: 'absolute',
-                                                top: 0,
-                                                left: 0,
-                                                width: '100%',
-                                                height: '100%',
-                                                transform: 'rotateY(180deg)',
-                                                WebkitTransform: 'rotateY(180deg)',
-                                                pointerEvents: 'none',
-                                                objectFit: 'cover'
-                                            }}
-                                        />
-                                    </div>
-                                </div>
+                        />
+                        {scan && (
+                            <div style={{
+                                width: window.innerWidth < 768 ? '1rem' : '1.2rem',
+                                height: window.innerWidth < 768 ? '1rem' : '1.2rem',
+                                borderRadius: '50%',
+                                border: '0.2rem solid white',
+                                backgroundColor: poseVisible === 'true' ? '#4CAF50' : '#FF0000'
+                            }} />
+                        )}
+                        {!scan ? (
+                            <p style={{ 
+                                textAlign: 'left', 
+                                margin: 0, 
+                                fontSize: window.innerWidth < 768 ? '0.8rem' : '1rem',
+                                lineHeight: '1.2',
+                                color: 'white'
+                            }}>
+                                {modelError ? 'Model Error' : 
+                                 !isModelLoaded ? 'Loading model...' :
+                                 !detectorInitialized ? 'Loading video...' :
+                                 !is_demo_session && !localStorage.getItem('idToken') 
+                                    ? 'Login needed'
+                                    : 'Start detection'}
+                            </p>
+                        ) : (
+                            <p style={{ 
+                                textAlign: 'left', 
+                                margin: 0, 
+                                fontSize: window.innerWidth < 768 ? '0.8rem' : '1rem',
+                                lineHeight: '1.2',
+                                color: 'white'
+                            }}>
+                                {poseVisible === 'true' ? 'Detecting' : 'Searching...'}
+                            </p>
+                        )}
+                    </div>
 
-                                {/* Status indicators - Center */}
-                                <div className={`d-flex ${window.innerWidth >= 768 ? 'flex-row' : 'flex-column'} align-items-center gap-0`} style={{ flex: 1 }}>
-                                    <div className={`d-flex gap-2 align-items-center justify-content-start ${window.innerWidth < 768 ? 'mb-2' : ''}`} style={{ width: '100%' }}>
-                                        <PlayPauseButton
-                                            onClick={handlePoseDetection}
-                                            isPlaying={scan}
-                                            size={window.innerWidth < 768 ? '3.2rem' : '4rem'}
-                                            isEnabled={isModelLoaded && detectorInitialized && !modelError && (localStorage.getItem('idToken') || is_demo_session)}
-                                            style={{
-                                                width: window.innerWidth < 768 ? '3.2rem' : '4rem',
-                                                height: window.innerWidth < 768 ? '3.2rem' : '4rem'
-                                            }}
-                                        />
-                                        {scan && (
-                                            <div style={{
-                                                width: window.innerWidth < 768 ? '1rem' : '1.2rem',
-                                                height: window.innerWidth < 768 ? '1rem' : '1.2rem',
-                                                borderRadius: '50%',
-                                                border: '0.2rem solid white',
-                                                backgroundColor: poseVisible === 'true' ? '#4CAF50' : '#FF0000'
-                                            }} />
-                                        )}
-                                        {!scan ? (
-                                            <p style={{ 
-                                                textAlign: 'left', 
-                                                margin: 0, 
-                                                fontSize: window.innerWidth < 768 ? '0.5rem' : '0.6rem',
-                                                lineHeight: '1.2'
-                                            }}>
-                                                {modelError ? 'Model Error' : 
-                                                 !isModelLoaded ? 'Loading model...' :
-                                                 !detectorInitialized ? 'Loading video...' :
-                                                 !is_demo_session && !localStorage.getItem('idToken') 
-                                                    ? 'Login needed'
-                                                    : 'Capture body pose'}
-                                            </p>
-                                        ) : (
-                                            <span style={{ fontSize: window.innerWidth < 768 ? '0.6rem' : '0.7rem' }}>Pose visible</span>
-                                        )}
-                                    </div>
-                                    <div className="d-flex gap-0 align-items-center justify-content-start" style={{ width: '100%' }}>
-                                        <div className="d-flex flex-column" style={{ minWidth: '80px' }}>
-                                            {scan ? (
-                                                poseVisible === 'true' ? (
-                                                    <p className="mb-1" style={{ fontSize: '0.5rem' }}>
-                                                        {landmarkCount} landmarks @ {Math.round(poseConfidence * 100)}%
-                                                    </p>
-                                                ) : (
-                                                    <p className="mb-1" style={{ fontSize: '0.5rem' }}>
-                                                        Body pose
-                                                    </p>
-                                                )
-                                            ) : (
-                                                <p className="mb-1" style={{ fontSize: '0.5rem' }}>
-                                                    Body pose
-                                                </p>
-                                            )}
-                                            <div className="d-flex align-items-center">
-                                                <div style={{ 
-                                                    width: '40px',
-                                                    height: '16px',
-                                                    border: '2px solid white',
-                                                    position: 'relative'
-                                                }}>
-                                                    <div style={{ 
-                                                        position: 'absolute',
-                                                        left: 0,
-                                                        top: 0,
-                                                        height: '100%',
-                                                        width: scan ? `${poseConfidence * 100}%` : '0%',
-                                                        backgroundColor: scan ? (poseConfidence > 0.7 ? '#4CAF50' : 'white') : 'transparent'
-                                                    }}/>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+                    {/* Webcam container */}
+                    <div className="d-flex justify-content-center">
+                        {/* Hidden camera for pose detection */}
+                        <OrientedCamera 
+                            stream={stream}
+                            onVideoRef={(videoElement) => {
+                                videoRef.current = videoElement;
+                            }}
+                            style={{ 
+                                position: 'absolute',
+                                width: cameraSize,
+                                height: cameraSize,
+                                opacity: 0, // Hide the camera image
+                                pointerEvents: 'none'
+                            }}
+                            objectPosition={window.innerWidth < 768 ? 'center 85%' : 'center'}
+                        />
+                        
+                        {/* Canvas for pose landmarks with white frame */}
+                        <div style={{
+                            position: 'relative',
+                            width: cameraSize,
+                            height: cameraSize,
+                            border: '2px solid white',
+                            borderRadius: '8px',
+                            backgroundColor: 'transparent',
+                            overflow: 'hidden'
+                        }}>
+                            <canvas
+                                ref={canvasRef}
+                                style={{
+                                    position: 'absolute',
+                                    top: 0,
+                                    left: 0,
+                                    width: '100%',
+                                    height: '100%',
+                                    transform: 'rotateY(180deg)',
+                                    WebkitTransform: 'rotateY(180deg)',
+                                    pointerEvents: 'none',
+                                    objectFit: 'cover'
+                                }}
+                            />
                         </div>
                     </div>
                 </div>
-            </Col>
-        </Row>
+            </div>
+        </div>
     );
 };
 

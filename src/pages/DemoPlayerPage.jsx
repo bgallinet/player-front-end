@@ -7,6 +7,7 @@ import EvaluationForm from '../components/EvaluationForm';
 import LargeTutorialButton from '../utils/LargeTutorialButton';
 import SignUpButton from '../utils/SignUpButton';
 import { useAuth } from '../contexts/AuthContext';
+import { useTutorial } from '../contexts/TutorialContext';
 import magicPlayerImage from '../images/magicplayer.png';
 
 const CLOUDFRONT_URL = 'https://dhuj2x4ippvty.cloudfront.net';
@@ -19,9 +20,17 @@ const DemoPlayerPage = () => {
     const audioRef = useRef(null);
     const evaluationTimerRef = useRef(null);
     const { idToken } = useAuth();
+    const { isTutorialMode, toggleTutorialMode } = useTutorial();
     
     // Duration in seconds before showing the evaluation form after play starts
     const EVALUATION_FORM_DELAY_SECONDS = 120;
+
+    // Enable tutorial mode when user arrives on the page
+    useEffect(() => {
+        if (!isTutorialMode) {
+            toggleTutorialMode();
+        }
+    }, []); // Empty dependency array - only run on mount
 
     // Evaluation form questions and input types
     const evaluationQuestions = [

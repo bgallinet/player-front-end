@@ -22,6 +22,9 @@ import SettingsButton from '../../utils/SettingsButton';
 import ExpandReduceButton from '../../utils/ExpandReduceButton';
 import { getDemoUsername, isDemoSession } from '../../hooks/demoUserManager';
 import { trackPageView } from '../../hooks/pageViewTracker';
+import AnalyticsAPI from '../../utils/AnalyticsAPI';
+import UserAPI from '../../utils/UserAPI';
+import { getSessionNameFromUrl } from '../../hooks/sessionUtils';
 
 const Player = ({
     // Audio source
@@ -361,10 +364,52 @@ const Player = ({
             }
             
             if (isPlaying) {
+                // Analytics: track pause
+                try {
+                    const isDemo = isDemoSession();
+                    const pauseData = {
+                        request_type: 'analytics',
+                        interaction_type: 'user_interaction',
+                        element_id: 'pause_music',
+                        page_url: window.location.href,
+                        session_name: getSessionNameFromUrl() || `${pageName}_session`
+                    };
+                    
+                    if (isDemo) {
+                        pauseData.user_name = getDemoUsername();
+                        AnalyticsAPI(JSON.stringify(pauseData)); // fire-and-forget
+                    } else {
+                        UserAPI(JSON.stringify(pauseData)); // fire-and-forget
+                    }
+                } catch (error) {
+                    // Analytics API error
+                }
+                
                 audioRef.current.pause();
                 setIsPlaying(false);
                 if (onMusicPause) onMusicPause();
             } else {
+                // Analytics: track play
+                try {
+                    const isDemo = isDemoSession();
+                    const playData = {
+                        request_type: 'analytics',
+                        interaction_type: 'user_interaction',
+                        element_id: 'play_music',
+                        page_url: window.location.href,
+                        session_name: getSessionNameFromUrl() || `${pageName}_session`
+                    };
+                    
+                    if (isDemo) {
+                        playData.user_name = getDemoUsername();
+                        AnalyticsAPI(JSON.stringify(playData)); // fire-and-forget
+                    } else {
+                        UserAPI(JSON.stringify(playData)); // fire-and-forget
+                    }
+                } catch (error) {
+                    // Analytics API error
+                }
+                
                 await audioRef.current.play();
                 setIsPlaying(true);
                 if (onMusicPlay) onMusicPlay();
@@ -377,6 +422,27 @@ const Player = ({
 
     // Handle stop
     const handleStop = () => {
+        // Analytics: track stop
+        try {
+            const isDemo = isDemoSession();
+            const stopData = {
+                request_type: 'analytics',
+                interaction_type: 'user_interaction',
+                element_id: 'stop_music',
+                page_url: window.location.href,
+                session_name: getSessionNameFromUrl() || `${pageName}_session`
+            };
+            
+            if (isDemo) {
+                stopData.user_name = getDemoUsername();
+                AnalyticsAPI(JSON.stringify(stopData)); // fire-and-forget
+            } else {
+                UserAPI(JSON.stringify(stopData)); // fire-and-forget
+            }
+        } catch (error) {
+            // Analytics API error
+        }
+        
         if (audioRef.current) {
             audioRef.current.pause();
             audioRef.current.currentTime = 0;
@@ -476,7 +542,7 @@ const Player = ({
             {isTutorialMode && !playerTutorialDismissed && (
                 <TutorialMessage 
                     messages={[
-                        "Use your webcam to detect your facial expressions and head nodding, and adjusts the audio in real-time.",
+                        "Welcome to the Soundbloom player ! Use your webcam to detect your facial expressions, head nodding, hand raising, and adjust the audio in real-time.",
                         "Get music started, allow to capture face movements capture, and play with audio effects.",
                         "You can customize audio mappings to create your own personal audio experience."
                     ]}
@@ -486,9 +552,6 @@ const Player = ({
             )}
 
             <div className="bg-dark rounded p-4" style={{ backgroundColor: '#1a1a1a' }}>
-                {/* Additional content (track selection, playlist, etc.) */}
-                {children}
-
                 {/* Error Display */}
                 {error && (
                     <Alert variant="danger" className="mb-4">
@@ -498,7 +561,7 @@ const Player = ({
 
                 {/* Audio Controls */}
                 {selectedFile && (
-                    <>
+                    <div style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
                         <AudioControls
                             isPlaying={isPlaying}
                             currentTime={currentTime}
@@ -521,38 +584,70 @@ const Player = ({
                             showAudioDevice={true}
                             showEmotionMapping={true}
                             showTutorial={true}
+                            style={{ marginBottom: '0' }}
                         />
 
-                        {/* SoundConsole Component */}
-                        <StyledCard className="mb-4">
-                            <div className="d-flex align-items-center justify-content-between mb-3">
-                                <Text style={{ margin: 0, fontSize: '1.1rem', fontWeight: 'bold' }}>
-                                    Sound Console
-                                </Text>
-                                <div className="d-flex gap-2 align-items-center">
-                                    <ExpandReduceButton
-                                        isExpanded={showAudioControls}
-                                        onToggle={() => setShowAudioControls(!showAudioControls)}
+                        {/* Detection UI - Conditional rendering based on mode */}
+                        {stream && (
+                            <>
+                                {detectionMode === 'landmark' && (
+                                    <FacialLandmarkUserUI 
+                                        stream={stream}
+                                        embeddingTW={false}
+                                        is_demo_session={is_demo_session}
+                                        demo_username={demo_username}
+                                        sessionName={`${pageName}_session`}
+                                        sizeMode="large"
                                     />
-                                </div>
-                            </div>
-                            
-                            {showAudioControls && (
-                                <SoundConsole
-                                    audioRef={audioRef}
-                                    volume={volume}
-                                    baseVolume={baseVolume}
-                                    onVolumeChange={handleVolumeChange}
-                                    eqMappings={eqMappings}
-                                    volumeMappings={volumeMappings}
-                                    recommendation={currentRecommendation}
-                                    rhythmicEnhancementMappings={rhythmicEnhancementMappings}
-                                    reverbMappings={reverbMappings}
-                                    noddingAmplitude={noddingAmplitude}
+                                )}
+                                {detectionMode === 'body' && (
+                                    <BodyPoseUserUI 
+                                        stream={stream}
+                                        embeddingTW={false}
+                                        is_demo_session={is_demo_session}
+                                        demo_username={demo_username}
+                                        sessionName={`${pageName}_session`}
+                                        sizeMode="large"
+                                    />
+                                )}
+                            </>
+                        )}
+                    </div>
+                )}
+
+                {/* Additional content (track selection, playlist, etc.) */}
+                {children}
+
+                {/* SoundConsole Component - At the bottom */}
+                {selectedFile && (
+                    <StyledCard className="mb-4">
+                        <div className="d-flex align-items-center justify-content-between mb-3">
+                            <Text style={{ margin: 0, fontSize: '1.1rem', fontWeight: 'bold' }}>
+                                Sound Console
+                            </Text>
+                            <div className="d-flex gap-2 align-items-center">
+                                <ExpandReduceButton
+                                    isExpanded={showAudioControls}
+                                    onToggle={() => setShowAudioControls(!showAudioControls)}
                                 />
-                            )}
-                        </StyledCard>
-                    </>
+                            </div>
+                        </div>
+                        
+                        {showAudioControls && (
+                            <SoundConsole
+                                audioRef={audioRef}
+                                volume={volume}
+                                baseVolume={baseVolume}
+                                onVolumeChange={handleVolumeChange}
+                                eqMappings={eqMappings}
+                                volumeMappings={volumeMappings}
+                                recommendation={currentRecommendation}
+                                rhythmicEnhancementMappings={rhythmicEnhancementMappings}
+                                reverbMappings={reverbMappings}
+                                noddingAmplitude={noddingAmplitude}
+                            />
+                        )}
+                    </StyledCard>
                 )}
 
                 {/* Hidden Audio Element */}
@@ -640,43 +735,6 @@ const Player = ({
                 onToggleEmotionMappings={setShowEmotionMappings}
             />
             
-            {/* Detection UI - Conditional rendering based on mode */}
-            {selectedFile && stream && (
-                <>
-                    {detectionMode === 'landmark' && (
-                        <FacialLandmarkUserUI 
-                            stream={stream}
-                            embeddingTW={false}
-                            is_demo_session={is_demo_session}
-                            demo_username={demo_username}
-                            sessionName={`${pageName}_session`}
-                            sizeMode="large"
-                        />
-                    )}
-                    {detectionMode === 'body' && (
-                        <BodyPoseUserUI 
-                            stream={stream}
-                            embeddingTW={false}
-                            is_demo_session={is_demo_session}
-                            demo_username={demo_username}
-                            sessionName={`${pageName}_session`}
-                            sizeMode="large"
-                        />
-                    )}
-                </>
-            )}
-            
-            {/* Spacing div to avoid cropping */}
-            <div style={{
-                bottom: 0,
-                left: 0,
-                right: 0,
-                backgroundColor: '#000000',
-                padding: '1rem',
-                borderTop: '1px solid rgba(255, 255, 255, 0.1)',
-                height: '200px'
-            }}>
-            </div>
         </Container>
     );
 };

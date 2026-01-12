@@ -58,7 +58,7 @@ const AudioControls = ({
 
 
     return (
-        <div className={`mb-4 ${className}`} style={style}>
+        <div className={className} style={{ marginBottom: '0', ...style }}>
             {/* Control Buttons */}
             <div className="d-flex justify-content-center align-items-center gap-4 mb-3">
                 {/* Previous Button */}
