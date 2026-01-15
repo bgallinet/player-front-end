@@ -1,5 +1,5 @@
 // API Gateway URL - using custom domain for stable endpoint
-const API_gateway_url = "https://ta7503ad00.execute-api.eu-west-3.amazonaws.com/player-test-stage-aq09qehh";
+const API_gateway_url = "https://uaelhqz7ej.execute-api.eu-west-3.amazonaws.com/player-test-stage-aa0oqn3s";
 
 // WebSocket URLs (without protocol - will be auto-detected based on page protocol)
 const WebSocketURL = "ws-player-test.crowd-sensor.com"; // Domain endpoint (HTTPS pages → wss://)
