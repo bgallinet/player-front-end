@@ -22,9 +22,6 @@ import SettingsButton from '../../utils/SettingsButton';
 import ExpandReduceButton from '../../utils/ExpandReduceButton';
 import { getDemoUsername, isDemoSession } from '../../hooks/demoUserManager';
 import { trackPageView } from '../../hooks/pageViewTracker';
-import AnalyticsAPI from '../../utils/AnalyticsAPI';
-import UserAPI from '../../utils/UserAPI';
-import { getSessionNameFromUrl } from '../../hooks/sessionUtils';
 
 const Player = ({
     // Audio source
@@ -364,52 +361,10 @@ const Player = ({
             }
             
             if (isPlaying) {
-                // Analytics: track pause
-                try {
-                    const isDemo = isDemoSession();
-                    const pauseData = {
-                        request_type: 'analytics',
-                        interaction_type: 'user_interaction',
-                        element_id: 'pause_music',
-                        page_url: window.location.href,
-                        session_name: getSessionNameFromUrl() || `${pageName}_session`
-                    };
-                    
-                    if (isDemo) {
-                        pauseData.user_name = getDemoUsername();
-                        AnalyticsAPI(JSON.stringify(pauseData)); // fire-and-forget
-                    } else {
-                        UserAPI(JSON.stringify(pauseData)); // fire-and-forget
-                    }
-                } catch (error) {
-                    // Analytics API error
-                }
-                
                 audioRef.current.pause();
                 setIsPlaying(false);
                 if (onMusicPause) onMusicPause();
             } else {
-                // Analytics: track play
-                try {
-                    const isDemo = isDemoSession();
-                    const playData = {
-                        request_type: 'analytics',
-                        interaction_type: 'user_interaction',
-                        element_id: 'play_music',
-                        page_url: window.location.href,
-                        session_name: getSessionNameFromUrl() || `${pageName}_session`
-                    };
-                    
-                    if (isDemo) {
-                        playData.user_name = getDemoUsername();
-                        AnalyticsAPI(JSON.stringify(playData)); // fire-and-forget
-                    } else {
-                        UserAPI(JSON.stringify(playData)); // fire-and-forget
-                    }
-                } catch (error) {
-                    // Analytics API error
-                }
-                
                 await audioRef.current.play();
                 setIsPlaying(true);
                 if (onMusicPlay) onMusicPlay();
@@ -422,27 +377,6 @@ const Player = ({
 
     // Handle stop
     const handleStop = () => {
-        // Analytics: track stop
-        try {
-            const isDemo = isDemoSession();
-            const stopData = {
-                request_type: 'analytics',
-                interaction_type: 'user_interaction',
-                element_id: 'stop_music',
-                page_url: window.location.href,
-                session_name: getSessionNameFromUrl() || `${pageName}_session`
-            };
-            
-            if (isDemo) {
-                stopData.user_name = getDemoUsername();
-                AnalyticsAPI(JSON.stringify(stopData)); // fire-and-forget
-            } else {
-                UserAPI(JSON.stringify(stopData)); // fire-and-forget
-            }
-        } catch (error) {
-            // Analytics API error
-        }
-        
         if (audioRef.current) {
             audioRef.current.pause();
             audioRef.current.currentTime = 0;
@@ -552,6 +486,9 @@ const Player = ({
             )}
 
             <div className="bg-dark rounded p-4" style={{ backgroundColor: '#1a1a1a' }}>
+                {/* Additional content (track selection, playlist, etc.) */}
+                {children}
+
                 {/* Error Display */}
                 {error && (
                     <Alert variant="danger" className="mb-4">
@@ -561,7 +498,7 @@ const Player = ({
 
                 {/* Audio Controls */}
                 {selectedFile && (
-                    <div style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
+                    <div className="d-flex flex-column" style={{ width: '100%', overflow: 'visible' }}>
                         <AudioControls
                             isPlaying={isPlaying}
                             currentTime={currentTime}
@@ -589,7 +526,7 @@ const Player = ({
 
                         {/* Detection UI - Conditional rendering based on mode */}
                         {stream && (
-                            <>
+                            <div style={{ width: '100%', position: 'relative', zIndex: 1, clear: 'both', marginTop: '0.5rem', marginBottom: '1rem' }}>
                                 {detectionMode === 'landmark' && (
                                     <FacialLandmarkUserUI 
                                         stream={stream}
@@ -610,44 +547,39 @@ const Player = ({
                                         sizeMode="large"
                                     />
                                 )}
-                            </>
-                        )}
-                    </div>
-                )}
-
-                {/* Additional content (track selection, playlist, etc.) */}
-                {children}
-
-                {/* SoundConsole Component - At the bottom */}
-                {selectedFile && (
-                    <StyledCard className="mb-4">
-                        <div className="d-flex align-items-center justify-content-between mb-3">
-                            <Text style={{ margin: 0, fontSize: '1.1rem', fontWeight: 'bold' }}>
-                                Sound Console
-                            </Text>
-                            <div className="d-flex gap-2 align-items-center">
-                                <ExpandReduceButton
-                                    isExpanded={showAudioControls}
-                                    onToggle={() => setShowAudioControls(!showAudioControls)}
-                                />
                             </div>
-                        </div>
-                        
-                        {showAudioControls && (
-                            <SoundConsole
-                                audioRef={audioRef}
-                                volume={volume}
-                                baseVolume={baseVolume}
-                                onVolumeChange={handleVolumeChange}
-                                eqMappings={eqMappings}
-                                volumeMappings={volumeMappings}
-                                recommendation={currentRecommendation}
-                                rhythmicEnhancementMappings={rhythmicEnhancementMappings}
-                                reverbMappings={reverbMappings}
-                                noddingAmplitude={noddingAmplitude}
-                            />
                         )}
-                    </StyledCard>
+
+                        {/* SoundConsole Component */}
+                        <StyledCard className="mb-4" style={{ position: 'relative', zIndex: 0, width: '100%', clear: 'both', marginTop: '1rem' }}>
+                            <div className="d-flex align-items-center justify-content-between mb-3">
+                                <Text style={{ margin: 0, fontSize: '1.1rem', fontWeight: 'bold' }}>
+                                    Sound Console
+                                </Text>
+                                <div className="d-flex gap-2 align-items-center">
+                                    <ExpandReduceButton
+                                        isExpanded={showAudioControls}
+                                        onToggle={() => setShowAudioControls(!showAudioControls)}
+                                    />
+                                </div>
+                            </div>
+                            
+                            {showAudioControls && (
+                                <SoundConsole
+                                    audioRef={audioRef}
+                                    volume={volume}
+                                    baseVolume={baseVolume}
+                                    onVolumeChange={handleVolumeChange}
+                                    eqMappings={eqMappings}
+                                    volumeMappings={volumeMappings}
+                                    recommendation={currentRecommendation}
+                                    rhythmicEnhancementMappings={rhythmicEnhancementMappings}
+                                    reverbMappings={reverbMappings}
+                                    noddingAmplitude={noddingAmplitude}
+                                />
+                            )}
+                        </StyledCard>
+                    </div>
                 )}
 
                 {/* Hidden Audio Element */}

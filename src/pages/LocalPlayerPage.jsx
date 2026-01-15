@@ -153,7 +153,7 @@ const LocalPlayerPage = () => {
     // Store the selected folder from WelcomePlayerPage
     const [selectedFolder, setSelectedFolder] = useState(null);
     const [musicFiles, setMusicFiles] = useState([]);
-    const [isMusicLibraryExpanded, setIsMusicLibraryExpanded] = useState(false);
+    const [isMusicLibraryExpanded, setIsMusicLibraryExpanded] = useState(true);
 
     // Load music files from global variable when component mounts
     React.useEffect(() => {
