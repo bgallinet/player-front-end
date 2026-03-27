@@ -1,39 +1,46 @@
-// API Gateway URL - using custom domain for stable endpoint
-const API_gateway_url = "https://9ic2sonafk.execute-api.eu-west-3.amazonaws.com/player-test-stage-yf4kl6vh";
+//Powershell command for getting the API gateway URL:
+// aws apigateway get-rest-apis --query "items[*].[id,name]" --output text | ForEach-Object { $parts = $_ -split '\s+'; $apiId = $parts[0]; $apiName = $parts[1]; $stages = aws apigateway get-stages --rest-api-id $apiId --query "item[*].stageName" --output text; $stages -split '\s+' | ForEach-Object { Write-Output "$apiName - https://$apiId.execute-api.us-east-1.amazonaws.com/$_" } }
+
+const API_gateway_url = "https://ta7503ad00.execute-api.eu-west-3.amazonaws.com/player-test-stage-aq09qehh"; // To be changed
+
 
 // WebSocket URLs (without protocol - will be auto-detected based on page protocol)
-const WebSocketURL = "ws-player-test.crowd-sensor.com"; // Domain endpoint (HTTPS pages → wss://)
-const WebSocketTestURL = "player-test-websocket-alb-620473978.eu-west-3.elb.amazonaws.com"; // ALB direct URL (HTTP pages → ws://)
+const WebSocketURL = "ws-player-dev.crowd-sensor.com"; // Domain endpoint (HTTPS pages → wss://)
+const WebSocketTestURL = "ws://player-dev-websocket-alb-383665997.eu-west-3.elb.amazonaws.com"; // ALB direct URL (HTTP pages → ws://)
 
-const environment_flag = "prod"
+const environment_flag = "dev"
 
-// PKCE helper functions for prod environment
-const generateCodeVerifier = () => {
-    const array = new Uint8Array(32);
-    crypto.getRandomValues(array);
-    return btoa(String.fromCharCode(...array))
-        .replace(/\+/g, '-')
-        .replace(/\//g, '_')
-        .replace(/=/g, '');
+// Dynamically detect protocol (http or https) based on current page
+const getCurrentProtocol = () => {
+    if (typeof window !== 'undefined') {
+        return window.location.protocol; // 'http:' or 'https:'
+    }
+    return 'http:'; // Default fallback
 };
 
-const generateCodeChallenge = async (verifier) => {
-    const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
-    return btoa(String.fromCharCode(...new Uint8Array(hash)))
-        .replace(/\+/g, '-')
-        .replace(/\//g, '_')
-        .replace(/=/g, '');
+const getCurrentHost = () => {
+    if (typeof window !== 'undefined') {
+        return window.location.host; // 'localhost:3000' or whatever
+    }
+    return 'localhost:3000'; // Default fallback
 };
 
-// Prod environment configuration only
-const ClientID = '13042d8nu2ed805be955pnhu0i';
-const RedirectURI = 'https://soundbloom-player.com/callback';
+// Build redirect URI dynamically based on current page protocol
+const RedirectURI = `${getCurrentProtocol()}//${getCurrentHost()}/callback`;
 
-// AuthURL with PKCE for prod (confidential client) - WITHOUT empty code_challenge
-const AuthURL = `https://d3o5hrtbl653it.auth.eu-west-3.amazoncognito.com/oauth2/authorize?client_id=${ClientID}&response_type=code&scope=email+openid&redirect_uri=${encodeURIComponent(RedirectURI)}&code_challenge_method=S256`;
+// Build AuthURL with dynamically detected redirect URI
+const AuthURL = `https://d3o5hrtbl653it.auth.eu-west-3.amazoncognito.com/oauth2/authorize?client_id=3ng1jhbo6oemarms0uc9mhadak&response_type=code&scope=email+openid&redirect_uri=${encodeURIComponent(RedirectURI)}`;
 
 const CognitoURL = 'https://d3o5hrtbl653it.auth.eu-west-3.amazoncognito.com/oauth2/token';
 
+const ClientID = '3ng1jhbo6oemarms0uc9mhadak';
+
+// SoundCloud API credentials loaded from .env.local (gitignored, never committed)
+// Create web-app-front-end/.env.local with:
+//   REACT_APP_SC_CLIENT_ID=your_client_id
+//   REACT_APP_SC_CLIENT_SECRET=your_client_secret
+const SC_ClientID = process.env.REACT_APP_SC_CLIENT_ID || '';
+const SC_ClientSecret = process.env.REACT_APP_SC_CLIENT_SECRET || '';
 
 const EnvironmentVariables = {
     AuthURL: AuthURL,
@@ -46,8 +53,8 @@ const EnvironmentVariables = {
     CognitoURL: CognitoURL,
     ClientID: ClientID,
     environment_flag: environment_flag,
-    generateCodeVerifier: generateCodeVerifier,
-    generateCodeChallenge: generateCodeChallenge
+    SC_ClientID: SC_ClientID,
+    SC_ClientSecret: SC_ClientSecret,
 };
 
 export default EnvironmentVariables;

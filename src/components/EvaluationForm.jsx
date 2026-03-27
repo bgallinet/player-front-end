@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Button, Form } from 'react-bootstrap';
 import AnalyticsAPI from '../utils/AnalyticsAPI.jsx';
 import { getSessionNameFromUrl } from '../hooks/sessionUtils.js';
+import { getDemoUsername } from '../hooks/demoUserManager';
 import { secondaryColor } from '../utils/DisplaySettings';
 
 /**
@@ -138,7 +139,7 @@ const EvaluationForm = ({
                     'results': results
                 },
                 // Add user_name for demo sessions
-                ...(is_demo_session && { 'user_name': 'demo_user_ye5e5p' })
+                ...(is_demo_session && { 'user_name': getDemoUsername() })
             });
 
             const parsedData = JSON.parse(analyticsData);

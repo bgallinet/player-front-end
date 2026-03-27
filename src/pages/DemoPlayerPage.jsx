@@ -1,12 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Image, Button } from 'react-bootstrap';
-import { Subtitle } from '../utils/StyledComponents';
 import Player from '../components/player/Player';
-import TrackChoice from '../components/player/TrackChoice';
+import TrackChoice from '../library_panels/TrackChoice';
 import EvaluationForm from '../components/EvaluationForm';
-import LargeTutorialButton from '../utils/LargeTutorialButton';
-import SignUpButton from '../utils/SignUpButton';
+import LargeTutorialButton from '../components/buttons/LargeTutorialButton';
+import SignUpButton from '../components/buttons/SignUpButton';
 import { useAuth } from '../contexts/AuthContext';
+import { useTutorial } from '../contexts/TutorialContext';
 import magicPlayerImage from '../images/magicplayer.png';
 
 const CLOUDFRONT_URL = 'https://dhuj2x4ippvty.cloudfront.net';
@@ -17,7 +17,19 @@ const DemoPlayerPage = () => {
     const [error, setError] = useState('');
     const [showEvaluationForm, setShowEvaluationForm] = useState(false);
     const audioRef = useRef(null);
+    const evaluationTimerRef = useRef(null);
     const { idToken } = useAuth();
+    const { isTutorialMode, toggleTutorialMode } = useTutorial();
+    
+    // Duration in seconds before showing the evaluation form after play starts
+    const EVALUATION_FORM_DELAY_SECONDS = 120;
+
+    // Enable tutorial mode when user arrives on the page
+    useEffect(() => {
+        if (!isTutorialMode) {
+            toggleTutorialMode();
+        }
+    }, []); // Empty dependency array - only run on mount
 
     // Evaluation form questions and input types
     const evaluationQuestions = [
@@ -55,17 +67,35 @@ const DemoPlayerPage = () => {
             }
         }, 100);
         
-        return () => clearTimeout(timer);
+        return () => {
+            clearTimeout(timer);
+            // Cleanup evaluation timer on unmount
+            if (evaluationTimerRef.current) {
+                clearTimeout(evaluationTimerRef.current);
+            }
+        };
     }, []);
 
-    // Handle music play event (no automatic popup)
+    // Handle music play event - show form after delay
     const handleMusicPlay = () => {
-        // No automatic evaluation form popup
+        // Clear any existing timer
+        if (evaluationTimerRef.current) {
+            clearTimeout(evaluationTimerRef.current);
+        }
+        
+        // Set timer to show evaluation form after the specified delay
+        evaluationTimerRef.current = setTimeout(() => {
+            setShowEvaluationForm(true);
+        }, EVALUATION_FORM_DELAY_SECONDS * 1000);
     };
 
-    // Handle music pause/stop
+    // Handle music pause/stop - cancel the timer
     const handleMusicPause = () => {
-        // No timer to cancel
+        // Clear the timer if music is paused/stopped before the delay
+        if (evaluationTimerRef.current) {
+            clearTimeout(evaluationTimerRef.current);
+            evaluationTimerRef.current = null;
+        }
     };
 
     // Handle track selection from TrackChoice
@@ -96,6 +126,11 @@ const DemoPlayerPage = () => {
         }
     };
 
+    // Handle feedback button click - show evaluation form
+    const handleFeedbackClick = () => {
+        setShowEvaluationForm(true);
+    };
+
 
     return (
         <Player
@@ -105,6 +140,7 @@ const DemoPlayerPage = () => {
             audioRef={audioRef}
             onMusicPlay={handleMusicPlay}
             onMusicPause={handleMusicPause}
+            fallbackDeckArtworkSrc={magicPlayerImage}
         >
             {/* Welcome Image - Only show when no file is selected */}
             {!selectedFile && (
@@ -131,9 +167,20 @@ const DemoPlayerPage = () => {
                             overflow: 'visible'
                         }}
                     />
-                    {!idToken && (
-                        <SignUpButton />
-                    )}
+                    <Button
+                        variant="outline-light"
+                        onClick={handleFeedbackClick}
+                        className="me-2"
+                        style={{
+                            padding: '0.75rem 1.5rem',
+                            fontSize: '1rem',
+                            whiteSpace: 'nowrap',
+                            minWidth: 'fit-content'
+                        }}
+                    >
+                        Feedback
+                    </Button>
+                    <SignUpButton />
                 </div>
             </div>
 
@@ -153,7 +200,7 @@ const DemoPlayerPage = () => {
                 sessionName={null}
                 show={showEvaluationForm}
                 onHide={() => setShowEvaluationForm(false)}
-                disableSubmission={true}
+                disableSubmission={false}
             />
         </Player>
     );

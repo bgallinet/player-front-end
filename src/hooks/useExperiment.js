@@ -15,11 +15,11 @@ export const fetchExperiment = async (experimentName) => {
         let username = idToken ? 'authenticated_user' : demoUsername;
         
         // TEST: Replace demo username suffix with random for testing different variants
-        if (!idToken) {
+/*         if (!idToken) {
             const baseUsername = 'demo_user_';
             const randomSuffix = Math.random().toString(36).substr(2, 9);
             username = `${baseUsername}${randomSuffix}`;
-        }
+        } */
         
         // Prepare analytics data
         const analyticsData = JSON.stringify({

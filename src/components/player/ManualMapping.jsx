@@ -33,7 +33,16 @@ import { Form } from 'react-bootstrap';
 import { Subtitle, Text } from '../../utils/StyledComponents';
 import { secondaryColor } from '../../utils/DisplaySettings';
 import settingsIcon from '../../images/settingsicon.png';
-import CloseButton from '../../utils/CloseButton';
+import CloseButton from '../buttons/CloseButton';
+import {
+    KEY_SHIFT_SEMITONE_MIN,
+    KEY_SHIFT_SEMITONE_MAX
+} from '../audio_processing/audioEffects/keyShift';
+import { resolveKeyShiftSemitonesForEmotion } from './ReactionToSoundMapper';
+import {
+    BPM_SHIFT_PERCENT_MIN,
+    BPM_SHIFT_PERCENT_MAX
+} from '../audio_processing/audioEffects/bpmShift';
 
 const ManualMapping = ({
     // Emotion mapping state
@@ -55,6 +64,12 @@ const ManualMapping = ({
     // Delay mapping state
     delayMappings,
     onDelayMappingChange,
+
+    // Key / BPM mapping state
+    keyShiftMappings,
+    onKeyShiftMappingChange,
+    bpmShiftMappings,
+    onBpmShiftMappingChange,
     
     // Visibility control
     showEmotionMappings,
@@ -68,6 +83,8 @@ const ManualMapping = ({
         { key: 'nodding+happy', label: 'Nodding + Smiling', icon: '' },
         { key: 'nodding+surprised', label: 'Nodding + Surprised', icon: '' },
         { key: 'nodding+neutral', label: 'Nodding + Neutral', icon: '' },
+        { key: 'thumbUp', label: 'Thumb up', icon: '' },
+        { key: 'thumbDown', label: 'Thumb down', icon: '' },
         { key: 'handsRaised', label: 'Hands Raised', icon: '' },
         { key: 'happy', label: 'Smiling', icon: '' },
         { key: 'surprised', label: 'Surprised', icon: '' },
@@ -117,6 +134,14 @@ const ManualMapping = ({
     const handleDelayMappingChange = (delayAmount) => {
         onDelayMappingChange(selectedEmotion, parseFloat(delayAmount));
     };
+
+    const handleKeyShiftMappingChange = (semitones) => {
+        onKeyShiftMappingChange(selectedEmotion, parseInt(semitones, 10));
+    };
+
+    const handleBpmShiftMappingChange = (percent) => {
+        onBpmShiftMappingChange(selectedEmotion, parseInt(percent, 10));
+    };
     
     // Get current values for selected emotion
     const getCurrentEqValue = (bandIndex) => {
@@ -141,6 +166,13 @@ const ManualMapping = ({
     
     const getCurrentDelayValue = () => {
         return delayMappings[selectedEmotion] || 0;
+    };
+
+    const getCurrentKeyShiftValue = () =>
+        resolveKeyShiftSemitonesForEmotion(keyShiftMappings, selectedEmotion);
+
+    const getCurrentBpmShiftValue = () => {
+        return bpmShiftMappings[selectedEmotion] ?? 0;
     };
 
     return (
@@ -345,6 +377,60 @@ const ManualMapping = ({
                             />
                         </div>
 
+                        {/* Key shift (manual mapping) */}
+                        <div className="mb-4">
+                            <div className="d-flex justify-content-between align-items-center mb-2">
+                                <Text style={{ fontSize: '1rem', margin: 0, fontWeight: 'bold' }}>Key shift:</Text>
+                                <Text style={{ fontSize: '1rem', margin: 0, color: secondaryColor, fontWeight: 'bold' }}>
+                                    {getCurrentKeyShiftValue() === 0
+                                        ? 'Original'
+                                        : `${getCurrentKeyShiftValue() > 0 ? '+' : ''}${getCurrentKeyShiftValue()} semitones`}
+                                </Text>
+                            </div>
+                            <div className="d-flex align-items-center gap-3">
+                                <span style={{ fontSize: '0.8rem', whiteSpace: 'nowrap' }}>{KEY_SHIFT_SEMITONE_MIN}</span>
+                                <Form.Range
+                                    min={KEY_SHIFT_SEMITONE_MIN}
+                                    max={KEY_SHIFT_SEMITONE_MAX}
+                                    step="1"
+                                    value={getCurrentKeyShiftValue()}
+                                    onChange={(e) => handleKeyShiftMappingChange(e.target.value)}
+                                    style={{
+                                        flex: 1,
+                                        background: `linear-gradient(to right, #333 0%, #333 ${((getCurrentKeyShiftValue() - KEY_SHIFT_SEMITONE_MIN) / (KEY_SHIFT_SEMITONE_MAX - KEY_SHIFT_SEMITONE_MIN)) * 100}%, ${secondaryColor} ${((getCurrentKeyShiftValue() - KEY_SHIFT_SEMITONE_MIN) / (KEY_SHIFT_SEMITONE_MAX - KEY_SHIFT_SEMITONE_MIN)) * 100}%, ${secondaryColor} 100%)`
+                                    }}
+                                />
+                                <span style={{ fontSize: '0.8rem', whiteSpace: 'nowrap' }}>+{KEY_SHIFT_SEMITONE_MAX}</span>
+                            </div>
+                        </div>
+
+                        {/* BPM shift (manual mapping) */}
+                        <div className="mb-4">
+                            <div className="d-flex justify-content-between align-items-center mb-2">
+                                <Text style={{ fontSize: '1rem', margin: 0, fontWeight: 'bold' }}>BPM shift:</Text>
+                                <Text style={{ fontSize: '1rem', margin: 0, color: secondaryColor, fontWeight: 'bold' }}>
+                                    {getCurrentBpmShiftValue() === 0
+                                        ? 'Original'
+                                        : `${getCurrentBpmShiftValue() > 0 ? '+' : ''}${getCurrentBpmShiftValue()}%`}
+                                </Text>
+                            </div>
+                            <div className="d-flex align-items-center gap-3">
+                                <span style={{ fontSize: '0.8rem', whiteSpace: 'nowrap' }}>{BPM_SHIFT_PERCENT_MIN}%</span>
+                                <Form.Range
+                                    min={BPM_SHIFT_PERCENT_MIN}
+                                    max={BPM_SHIFT_PERCENT_MAX}
+                                    step="1"
+                                    value={getCurrentBpmShiftValue()}
+                                    onChange={(e) => handleBpmShiftMappingChange(e.target.value)}
+                                    style={{
+                                        flex: 1,
+                                        background: `linear-gradient(to right, #333 0%, #333 ${((getCurrentBpmShiftValue() - BPM_SHIFT_PERCENT_MIN) / (BPM_SHIFT_PERCENT_MAX - BPM_SHIFT_PERCENT_MIN)) * 100}%, ${secondaryColor} ${((getCurrentBpmShiftValue() - BPM_SHIFT_PERCENT_MIN) / (BPM_SHIFT_PERCENT_MAX - BPM_SHIFT_PERCENT_MIN)) * 100}%, ${secondaryColor} 100%)`
+                                    }}
+                                />
+                                <span style={{ fontSize: '0.8rem', whiteSpace: 'nowrap' }}>+{BPM_SHIFT_PERCENT_MAX}%</span>
+                            </div>
+                        </div>
+
                         <div 
                             className="mt-4 pt-3" 
                             style={{ 
@@ -364,6 +450,8 @@ const ManualMapping = ({
                                 <li>Rhythmic enhancement ranges from Off (0%) to Maximum (100%)</li>
                                 <li>Reverb amounts range from Off (0%) to Maximum (100%)</li>
                                 <li>Delay amounts range from Off (0%) to Maximum (100%)</li>
+                                <li>Key shift ranges from −12 to +12 semitones (0 = original pitch)</li>
+                                <li>BPM shift ranges from {BPM_SHIFT_PERCENT_MIN}% to +{BPM_SHIFT_PERCENT_MAX}% (0 = original tempo)</li>
                                 <li>Nodding states scale EQ intensity and volume based on head movement amplitude (0-3)</li>
                                 <li>Changes apply immediately - try different emotions to test your settings!</li>
                             </ul>

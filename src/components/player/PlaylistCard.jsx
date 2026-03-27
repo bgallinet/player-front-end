@@ -53,6 +53,17 @@ const PlaylistCard = ({
         setDraggedItem({ track, index });
         e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setData('text/html', e.target.outerHTML);
+        e.dataTransfer.setData('text/plain', track?.name || `track-${index}`);
+        const dragPayload = {
+            ...track,
+            playlistIndex: index
+        };
+        window.draggedTrack = dragPayload;
+        try {
+            e.dataTransfer.setData('application/x-soundbloom-track', JSON.stringify(dragPayload));
+        } catch (error) {
+            // Keep window.draggedTrack fallback if custom payload serialization fails.
+        }
         
         // Add visual feedback
         e.target.style.opacity = '0.5';
@@ -128,6 +139,10 @@ const PlaylistCard = ({
         setDraggedItem(null);
         setDragOverIndex(null);
         setIsDragOver(false);
+        // Delay cleanup so external drop handlers can still access payload.
+        setTimeout(() => {
+            window.draggedTrack = null;
+        }, 100);
     }, []);
 
     // Handle external drop (from music library)
@@ -158,7 +173,34 @@ const PlaylistCard = ({
                     // Clear the global reference
                     window.draggedFile = null;
                     // File added successfully to playlist
+                } else if (window.draggedTrack) {
+                    const droppedTrack = window.draggedTrack;
+                    const normalizedTrack = {
+                        ...droppedTrack,
+                        id: droppedTrack.id || Date.now() + Math.random(),
+                        name: droppedTrack.name || droppedTrack.title || 'Unknown track',
+                        duration: droppedTrack.duration || 0
+                    };
+
+                    const newPlaylist = [...playlist, normalizedTrack];
+                    onPlaylistChange(newPlaylist, currentTrackIndex);
+                    window.draggedTrack = null;
                 } else {
+                    const serializedTrack = e.dataTransfer.getData('application/x-soundbloom-track');
+                    if (serializedTrack) {
+                        const droppedTrack = JSON.parse(serializedTrack);
+                        const normalizedTrack = {
+                            ...droppedTrack,
+                            id: droppedTrack.id || Date.now() + Math.random(),
+                            name: droppedTrack.name || droppedTrack.title || 'Unknown track',
+                            duration: droppedTrack.duration || 0
+                        };
+
+                        const newPlaylist = [...playlist, normalizedTrack];
+                        onPlaylistChange(newPlaylist, currentTrackIndex);
+                        return;
+                    }
+
                     // Fallback: try to get data from text/plain
                     const fileName = e.dataTransfer.getData('text/plain');
                     if (fileName) {
@@ -228,7 +270,7 @@ const PlaylistCard = ({
                     }}
                 >
                     <Text style={{ fontSize: '1.2rem', fontWeight: 'bold', color: secondaryColor }}>
-                        Drop tracks here to add to playlist
+                        Drop tracks here to add to selection
                     </Text>
                 </div>
             )}
@@ -236,7 +278,7 @@ const PlaylistCard = ({
             {/* Header */}
             <div className="d-flex align-items-center justify-content-between mb-3">
                 <Subtitle style={{ margin: 0, fontSize: '1.1rem' }}>
-                    🎵 Playlist ({playlist.length})
+                    Selection ({playlist.length})
                 </Subtitle>
                 <Button
                     variant="outline-light"
@@ -248,12 +290,20 @@ const PlaylistCard = ({
                         fontSize: '0.8rem'
                     }}
                 >
-                    Clear All
+                    Clear selection
                 </Button>
             </div>
 
-            {/* Playlist Content */}
-            <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
+            {/* Playlist Content — scroll when many SoundCloud / local tracks */}
+            <div
+                style={{
+                    maxHeight: 'min(55vh, 520px)',
+                    overflowY: 'auto',
+                    overflowX: 'hidden',
+                    WebkitOverflowScrolling: 'touch',
+                    overscrollBehavior: 'contain',
+                }}
+            >
                 {playlist.length === 0 ? (
                     // Empty Playlist
                     <div style={{ 
@@ -267,10 +317,10 @@ const PlaylistCard = ({
                     }}>
                         <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📝</div>
                         <Subtitle style={{ fontSize: '1.1rem', marginBottom: '1rem' }}>
-                            Empty Playlist
+                            Nothing in selection
                         </Subtitle>
                         <Text style={{ fontSize: '0.9rem', marginBottom: '1rem' }}>
-                            Drag tracks from the music library or use the "Add to Playlist" button
+                            Drag tracks from the library or use the add control to build your selection
                         </Text>
                         <Text style={{ fontSize: '0.8rem', opacity: 0.7 }}>
                             Tracks will play automatically in sequence
@@ -401,7 +451,7 @@ const PlaylistCard = ({
                     textAlign: 'center'
                 }}>
                     <Text style={{ margin: 0 }}>
-                        Drag tracks from music library or use the "+" button • Drag to reorder
+                        Drag from the library or use "+" • Drag rows to reorder
                     </Text>
                 </div>
             )}
