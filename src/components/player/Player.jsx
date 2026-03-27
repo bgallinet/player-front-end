@@ -1,9 +1,8 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Container, Alert, Button, Dropdown } from 'react-bootstrap';
+import { Container, Alert, Button } from 'react-bootstrap';
 import { Text } from '../../utils/StyledComponents';
 import { secondaryColor } from '../../utils/DisplaySettings';
-import FacialLandmarkUserUI from '../sensing/FacialLandmarkUserUI';
-import BodyPoseUserUI from '../sensing/BodyPoseUserUI';
+import UnifiedSensingUserUI from '../sensing/UnifiedSensingUserUI';
 import TutorialMessage from '../TutorialMessage';
 import Deck from './Deck';
 import DeckControls from './DeckControls';
@@ -102,6 +101,8 @@ const Player = ({
     const [stream, setStream] = useState(null);
     const [noddingAmplitude, setNoddingAmplitude] = useState(0);
     const [handsRaised, setHandsRaised] = useState(false);
+    const [thumbUpActive, setThumbUpActive] = useState(false);
+    const [thumbDownActive, setThumbDownActive] = useState(false);
     
     // Emotion data array for ReactionToSoundMapper
     const [emotionDataArray, setEmotionDataArray] = useState([]);
@@ -128,9 +129,6 @@ const Player = ({
     // Demo session logic
     const [is_demo_session, setIsDemoSession] = useState(false);
     const [demo_username, setDemoUsername] = useState(() => getDemoUsername());
-    
-    // Detection mode state: 'landmark' or 'body'
-    const [detectionMode, setDetectionMode] = useState('landmark');
     
     // Tutorial functionality
     const { isTutorialMode, toggleTutorialMode } = useTutorial();
@@ -340,15 +338,24 @@ const Player = ({
                     setNoddingAmplitude(0);
                 }
                 
-                // Collect hand raising data from localStorage
+                // Collect hand raising + thumb gesture flags from localStorage
                 try {
                     const leftHandRaised = localStorage.getItem('left_hand_raised') === 'true';
                     const rightHandRaised = localStorage.getItem('right_hand_raised') === 'true';
                     setHandsRaised(leftHandRaised || rightHandRaised);
+
+                    const leftDown = localStorage.getItem('mediapipe_left_thumb_down') === 'true';
+                    const rightDown = localStorage.getItem('mediapipe_right_thumb_down') === 'true';
+                    const leftUp = localStorage.getItem('mediapipe_left_thumb_up') === 'true';
+                    const rightUp = localStorage.getItem('mediapipe_right_thumb_up') === 'true';
+                    const anyDown = leftDown || rightDown;
+                    setThumbDownActive(anyDown);
+                    setThumbUpActive(!anyDown && (leftUp || rightUp));
                 } catch (error) {
                     setHandsRaised(false);
+                    setThumbDownActive(false);
+                    setThumbUpActive(false);
                 }
-                
             } catch (error) {
                 // Silent error handling
             }
@@ -466,7 +473,7 @@ const Player = ({
                 await audioRef.current.play();
                 setIsPlaying(true);
                 if (onMusicPlay) onMusicPlay();
-                if (autoStartLandmarkWithMusic && detectionMode === 'landmark') {
+                if (autoStartLandmarkWithMusic) {
                     setLandmarkAutoStartTick((t) => t + 1);
                 }
             }
@@ -631,11 +638,6 @@ const Player = ({
         setCurrentTimeDeckB(newTime);
     }, [durationDeckB]);
 
-    // Handle detection mode change
-    const handleDetectionModeChange = (mode) => {
-        setDetectionMode(mode);
-    };
-
     // Handle dropping/loading a track into deck A or B
     const handleLoadTrackToDeck = useCallback(async (deckId, track) => {
         if (!track) {
@@ -745,8 +747,8 @@ const Player = ({
             {isTutorialMode && !playerTutorialDismissed && (
                 <TutorialMessage 
                     messages={[
-                        "Welcome to the Soundbloom player ! Use your webcam to detect your facial expressions, head nodding, hand raising, and adjust the audio in real-time.",
-                        "Get music started, allow to capture face movements capture, and play with audio effects.",
+                        "Welcome to the Soundbloom player! Use your webcam for face, body pose, and hand signals together, then shape the audio in real time.",
+                        "Start music, allow the camera, and use the sensing controls to begin detection.",
                         "You can customize audio mappings to create your own personal audio experience."
                     ]}
                     position="top-center"
@@ -785,43 +787,6 @@ const Player = ({
                         )}
                     </div>
 
-                    {secondDeckActive && (
-                        <div className="d-flex justify-content-center mb-3">
-                            <Dropdown>
-                                <Dropdown.Toggle
-                                    variant="outline-light"
-                                    size="sm"
-                                    style={{
-                                        fontSize: '0.65rem',
-                                        whiteSpace: 'nowrap',
-                                        height: '1.75rem',
-                                        minWidth: '4.2rem',
-                                        boxShadow: 'none',
-                                        border: '1px solid rgba(255, 255, 255, 0.3)',
-                                        background: 'transparent',
-                                        color: 'white'
-                                    }}
-                                >
-                                    {detectionMode === 'landmark' ? '👤 Face' : '🤸 Body'}
-                                </Dropdown.Toggle>
-                                <Dropdown.Menu>
-                                    <Dropdown.Item
-                                        onClick={() => handleDetectionModeChange('landmark')}
-                                        active={detectionMode === 'landmark'}
-                                    >
-                                        👤 Face Mode
-                                    </Dropdown.Item>
-                                    <Dropdown.Item
-                                        onClick={() => handleDetectionModeChange('body')}
-                                        active={detectionMode === 'body'}
-                                    >
-                                        🤸 Body Mode
-                                    </Dropdown.Item>
-                                </Dropdown.Menu>
-                            </Dropdown>
-                        </div>
-                    )}
-
                     <div className="row g-3">
                         <div className={secondDeckActive ? 'col-12 col-lg-6' : 'col-12'}>
                             <Deck
@@ -854,9 +819,6 @@ const Player = ({
                                     hasNext={playlist.length > 0 && currentTrackIndex < playlist.length - 1}
                                     iconSize={secondDeckActive ? '1.68rem' : '2.1rem'}
                                     showPreviousNext={playlist.length > 0}
-                                    showDetectionMode={!secondDeckActive}
-                                    detectionMode={detectionMode}
-                                    onDetectionModeChange={handleDetectionModeChange}
                                     showAudioDevice={!secondDeckActive}
                                     showEmotionMapping={!secondDeckActive}
                                     showTutorial={!secondDeckActive}
@@ -941,34 +903,21 @@ const Player = ({
                         </div>
                     )}
 
-                    {/* Detection UI - Conditional rendering based on mode */}
+                    {/* Detection UI — face, pose, and hands in one pipeline */}
                     {stream && (
                         <div style={{ width: '100%', position: 'relative', zIndex: 1, clear: 'both', marginTop: '0.5rem', marginBottom: '1rem' }}>
-                            {detectionMode === 'landmark' && (
-                                <FacialLandmarkUserUI
-                                    stream={stream}
-                                    embeddingTW={false}
-                                    is_demo_session={is_demo_session}
-                                    demo_username={demo_username}
-                                    sessionName={`${pageName}_session`}
-                                    sizeMode="large"
-                                    autoStartLandmarkTick={
-                                        autoStartLandmarkWithMusic ? landmarkAutoStartTick : 0
-                                    }
-                                    forceStopDetectionTick={detectionForceStopTick}
-                                />
-                            )}
-                            {detectionMode === 'body' && (
-                                <BodyPoseUserUI
-                                    stream={stream}
-                                    embeddingTW={false}
-                                    is_demo_session={is_demo_session}
-                                    demo_username={demo_username}
-                                    sessionName={`${pageName}_session`}
-                                    sizeMode="large"
-                                    forceStopDetectionTick={detectionForceStopTick}
-                                />
-                            )}
+                            <UnifiedSensingUserUI
+                                stream={stream}
+                                embeddingTW={false}
+                                is_demo_session={is_demo_session}
+                                demo_username={demo_username}
+                                sessionName={`${pageName}_session`}
+                                sizeMode="large"
+                                autoStartLandmarkTick={
+                                    autoStartLandmarkWithMusic ? landmarkAutoStartTick : 0
+                                }
+                                forceStopDetectionTick={detectionForceStopTick}
+                            />
                         </div>
                     )}
                 </div>
@@ -1065,6 +1014,8 @@ const Player = ({
                             emotionDataArray={emotionDataArray}
                             noddingAmplitude={noddingAmplitude}
                             handsRaised={handsRaised}
+                            thumbUpActive={thumbUpActive}
+                            thumbDownActive={thumbDownActive}
                             eqMappings={eqMappings}
                             volumeMappings={volumeMappings}
                             rhythmicEnhancementMappings={rhythmicEnhancementMappings}
@@ -1081,7 +1032,7 @@ const Player = ({
                     </>
                 ) : (
                     <div className="text-center py-4">
-                        <Text>Please allow camera access to enable facial landmark detection features.</Text>
+                        <Text>Please allow camera access to enable face, body, and hand sensing.</Text>
                     </div>
                 )}
             </>

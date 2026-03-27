@@ -38,6 +38,7 @@ import {
     KEY_SHIFT_SEMITONE_MIN,
     KEY_SHIFT_SEMITONE_MAX
 } from '../audio_processing/audioEffects/keyShift';
+import { resolveKeyShiftSemitonesForEmotion } from './ReactionToSoundMapper';
 import {
     BPM_SHIFT_PERCENT_MIN,
     BPM_SHIFT_PERCENT_MAX
@@ -82,6 +83,8 @@ const ManualMapping = ({
         { key: 'nodding+happy', label: 'Nodding + Smiling', icon: '' },
         { key: 'nodding+surprised', label: 'Nodding + Surprised', icon: '' },
         { key: 'nodding+neutral', label: 'Nodding + Neutral', icon: '' },
+        { key: 'thumbUp', label: 'Thumb up', icon: '' },
+        { key: 'thumbDown', label: 'Thumb down', icon: '' },
         { key: 'handsRaised', label: 'Hands Raised', icon: '' },
         { key: 'happy', label: 'Smiling', icon: '' },
         { key: 'surprised', label: 'Surprised', icon: '' },
@@ -165,9 +168,8 @@ const ManualMapping = ({
         return delayMappings[selectedEmotion] || 0;
     };
 
-    const getCurrentKeyShiftValue = () => {
-        return keyShiftMappings[selectedEmotion] ?? 0;
-    };
+    const getCurrentKeyShiftValue = () =>
+        resolveKeyShiftSemitonesForEmotion(keyShiftMappings, selectedEmotion);
 
     const getCurrentBpmShiftValue = () => {
         return bpmShiftMappings[selectedEmotion] ?? 0;

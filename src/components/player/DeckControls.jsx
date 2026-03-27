@@ -1,5 +1,5 @@
 import React, { useCallback } from 'react';
-import { Dropdown, Spinner } from 'react-bootstrap';
+import { Spinner } from 'react-bootstrap';
 import { Text } from '../../utils/StyledComponents';
 import { secondaryColor } from '../../utils/DisplaySettings';
 import { usePointerSlide1D } from '../../hooks/usePointerSlide1D';
@@ -32,10 +32,6 @@ export const DeckControls = ({
     onLoadTrack = noop,
     iconSize = '2.1rem',
     showPreviousNext = true,
-    /** Face / Body — shown in transport row when both this and `onDetectionModeChange` are set */
-    showDetectionMode = false,
-    detectionMode = 'landmark',
-    onDetectionModeChange,
     /** Utility row below transport (audio device, mappings, tutorial) */
     showAudioDevice = false,
     showEmotionMapping = false,
@@ -188,40 +184,6 @@ export const DeckControls = ({
                         tooltipText="Previous"
                         isEnabled={hasPrevious}
                     />
-                )}
-                {showDetectionMode && onDetectionModeChange && (
-                    <Dropdown>
-                        <Dropdown.Toggle
-                            variant="outline-light"
-                            size="sm"
-                            style={{
-                                fontSize: '0.65rem',
-                                whiteSpace: 'nowrap',
-                                height: '1.75rem',
-                                minWidth: '4.2rem',
-                                boxShadow: 'none',
-                                border: '1px solid rgba(255, 255, 255, 0.3)',
-                                background: 'transparent',
-                                color: 'white'
-                            }}
-                        >
-                            {detectionMode === 'landmark' ? '👤 Face' : '🤸 Body'}
-                        </Dropdown.Toggle>
-                        <Dropdown.Menu>
-                            <Dropdown.Item
-                                onClick={() => onDetectionModeChange('landmark')}
-                                active={detectionMode === 'landmark'}
-                            >
-                                👤 Face Mode
-                            </Dropdown.Item>
-                            <Dropdown.Item
-                                onClick={() => onDetectionModeChange('body')}
-                                active={detectionMode === 'body'}
-                            >
-                                🤸 Body Mode
-                            </Dropdown.Item>
-                        </Dropdown.Menu>
-                    </Dropdown>
                 )}
                 <PlayPauseButton
                     onClick={onPlayPause}

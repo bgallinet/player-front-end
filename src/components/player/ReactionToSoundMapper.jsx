@@ -99,6 +99,8 @@ export const DEFAULT_EQ_MAPPINGS = {
     'nodding+happy': [-4, -3, 5, 8, 7, 3],      // vocal
     'nodding+surprised': [-3, -2, 0, 3, 6, 8],  // treble-boost
     'nodding+neutral': [8, 6, 3, 0, -2, -3],    // bass-boost
+    'thumbDown': [0, 0, 0, 0, 0, 0],
+    'thumbUp': [0, 0, 0, 0, 0, 0],
     'handsRaised': [8, 6, 3, 0, -2, -3],        // bass-boost
     'happy': [0, 0, 0, 0, 0, 0],                // flat
     'surprised': [0, 0, 0, 0, 0, 0],            // flat
@@ -109,6 +111,8 @@ export const DEFAULT_VOLUME_MAPPINGS = {
     'nodding+happy': 1.0,
     'nodding+surprised': 1.0, 
     'nodding+neutral': 1.0,
+    'thumbDown': 1.0,
+    'thumbUp': 1.0,
     'handsRaised': 1.2,
     'happy': 1.0,
     'surprised': 1.0,
@@ -121,6 +125,8 @@ export const DEFAULT_RHYTHMIC_ENHANCEMENT_MAPPINGS = {
     'nodding+happy': 0,
     'nodding+surprised': 0, 
     'nodding+neutral': 0,
+    'thumbDown': 0,
+    'thumbUp': 0,
     'handsRaised': 0,
     'happy': 100,
     'surprised': 0,
@@ -131,6 +137,8 @@ export const DEFAULT_REVERB_MAPPINGS = {
     'nodding+happy': 0,
     'nodding+surprised': 0, 
     'nodding+neutral': 0,
+    'thumbDown': 0,
+    'thumbUp': 0,
     'handsRaised': 0,
     'happy': 0,
     'surprised': 50,
@@ -141,6 +149,8 @@ export const DEFAULT_DELAY_MAPPINGS = {
     'nodding+happy': 0,
     'nodding+surprised': 0, 
     'nodding+neutral': 0,
+    'thumbDown': 0,
+    'thumbUp': 0,
     'handsRaised': 0,
     'happy': 0,
     'surprised': 40,
@@ -152,10 +162,22 @@ export const DEFAULT_KEY_SHIFT_MAPPINGS = {
     'nodding+happy': 0,
     'nodding+surprised': 0,
     'nodding+neutral': 0,
+    'thumbDown': -2,
+    'thumbUp': 2,
     'handsRaised': 0,
     'happy': 0,
     'surprised': 0,
     'neutral': 0
+};
+
+/**
+ * Key shift for an emotion: explicit `keyShiftMappings[emotion]` wins; if missing, use install default
+ * (so thumb up/down keep −2 / +2 even when parent state was partial or from an older schema).
+ */
+export const resolveKeyShiftSemitonesForEmotion = (keyShiftMappings, emotionState) => {
+    const v = keyShiftMappings?.[emotionState];
+    if (v !== undefined && v !== null) return v;
+    return DEFAULT_KEY_SHIFT_MAPPINGS[emotionState] ?? 0;
 };
 
 /** Per-emotion BPM shift in percent (−50 … +50); 0 = no change */
@@ -163,6 +185,8 @@ export const DEFAULT_BPM_SHIFT_MAPPINGS = {
     'nodding+happy': 0,
     'nodding+surprised': 0,
     'nodding+neutral': 0,
+    'thumbDown': 0,
+    'thumbUp': 0,
     'handsRaised': 0,
     'happy': 0,
     'surprised': 0,
@@ -175,6 +199,10 @@ const ReactionToSoundMapper = ({
     emotionDataArray = [],           // Array of recent reaction detections - each item contains numeric values: {timestamp, smiling: 0-1, jawOpen: 0-1, amplitude, frequency, xPosition, yPosition, width, height}
     noddingAmplitude = 0,             // Current nodding amplitude (number, 0.0-1.0+ range, >0.03 = nodding)
     handsRaised = false,               // Whether hands are raised (boolean)
+    /** MediaPipe GestureRecognizer — either hand thumb up (not simultaneous thumb-down). */
+    thumbUpActive = false,
+    /** Any hand thumb down (wins over thumb up when both appear). */
+    thumbDownActive = false,
     
     // Body pose data (future use) - will contain numeric pose coordinates
     bodyPoseDataArray = [],           // Array of recent body pose detections
@@ -307,18 +335,25 @@ const ReactionToSoundMapper = ({
         if (areHandsRaised()) {
             return 'handsRaised';
         }
-        
+        // Thumb gestures (down wins over up); use thumb* mapping keys (e.g. default key shift)
+        if (thumbDownActive) {
+            return 'thumbDown';
+        }
+        if (thumbUpActive) {
+            return 'thumbUp';
+        }
+
         if (!dominantEmotion) {
             return null;
         }
-        
+
         // Combine with nodding if user is nodding
         if (isNodding()) {
             return `nodding+${dominantEmotion}`;
         }
-        
+
         return dominantEmotion;
-    }, [isNodding, areHandsRaised]);
+    }, [isNodding, areHandsRaised, thumbDownActive, thumbUpActive]);
     
     /**
      * Generate audio parameter recommendations based on current emotion state
@@ -342,7 +377,7 @@ const ReactionToSoundMapper = ({
         const rhythmicEnhancement = rhythmicEnhancementMappings[emotionState];
         const reverbAmount = reverbMappings[emotionState];
         const delayAmount = delayMappings[emotionState];
-        const keyShiftSemitones = keyShiftMappings[emotionState] ?? 0;
+        const keyShiftSemitones = resolveKeyShiftSemitonesForEmotion(keyShiftMappings, emotionState);
         const bpmShiftPercent = bpmShiftMappings[emotionState] ?? 0;
         
         
@@ -361,6 +396,8 @@ const ReactionToSoundMapper = ({
             noddingAmplitude: isNodding() ? noddingAmplitude : 0,
             isNodding: isNodding(),
             handsRaised: areHandsRaised(),
+            thumbUpActive,
+            thumbDownActive,
             
             // Audio parameters - use exact values from mappings, no fallbacks
             eqPreset: eqPresetKeyword,        // Keep keyword for UI compatibility
@@ -390,11 +427,15 @@ const ReactionToSoundMapper = ({
         emotionDataArray,
         noddingAmplitude,
         handsRaised,
+        thumbUpActive,
+        thumbDownActive,
         eqMappings,
         volumeMappings,
         rhythmicEnhancementMappings,
         reverbMappings,
         delayMappings,
+        keyShiftMappings,
+        bpmShiftMappings,
         analyzeDominantEmotion,
         determineEmotionState,
         isNodding,
@@ -458,7 +499,16 @@ const ReactionToSoundMapper = ({
         return () => {
             clearInterval(interval);
         };
-    }, [onRecommendationChange, emotionDataArray, noddingAmplitude, handsRaised, generateRecommendation, hasRecommendationChanged]);
+    }, [
+        onRecommendationChange,
+        emotionDataArray,
+        noddingAmplitude,
+        handsRaised,
+        thumbUpActive,
+        thumbDownActive,
+        generateRecommendation,
+        hasRecommendationChanged
+    ]);
     
     // This is a headless component - no visual output
     return null;
