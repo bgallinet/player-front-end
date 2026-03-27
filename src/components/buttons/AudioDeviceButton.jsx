@@ -1,22 +1,19 @@
 import React, { useState } from 'react';
-import { secondaryColor } from './DisplaySettings';
-import backIcon from '../images/backicon.png';
+import { secondaryColor } from '../../utils/DisplaySettings';
+import soundSettingsIcon from '../../images/soundsettingsicon.png';
 
-const PreviousButton = ({
+const AudioDeviceButton = ({
     onClick,
     className = '',
     style = {},
     size = '2rem',
     showTooltip = true,
-    tooltipText = 'Previous',
-    isEnabled = true
+    tooltipText = 'Audio Device Settings'
 }) => {
     const [isHovered, setIsHovered] = useState(false);
 
     const handleMouseEnter = () => {
-        if (isEnabled) {
-            setIsHovered(true);
-        }
+        setIsHovered(true);
     };
 
     const handleMouseLeave = () => {
@@ -26,17 +23,21 @@ const PreviousButton = ({
     const buttonStyle = {
         width: size,
         height: size,
-        cursor: isEnabled ? 'pointer' : 'not-allowed',
-        opacity: isEnabled ? (isHovered ? 0.8 : 1) : 0.3,
+        minWidth: size,
+        minHeight: size,
+        boxSizing: 'border-box',
+        flexShrink: 0,
+        cursor: 'pointer',
+        opacity: isHovered ? 0.8 : 1,
         userSelect: 'none',
         padding: '0.5rem',
         borderRadius: '0.25rem',
         transition: 'all 0.2s ease',
-        transform: isEnabled && isHovered ? 'scale(1.1)' : 'scale(1)',
+        transform: isHovered ? 'scale(1.1)' : 'scale(1)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: isEnabled && isHovered ? 'rgba(255, 255, 255, 0.1)' : 'transparent',
+        backgroundColor: isHovered ? 'rgba(255, 255, 255, 0.1)' : 'transparent',
         ...style
     };
 
@@ -44,21 +45,21 @@ const PreviousButton = ({
         width: '100%',
         height: '100%',
         objectFit: 'contain',
-        filter: isEnabled && isHovered ? `brightness(1.2) drop-shadow(0 0 4px ${secondaryColor})` : 'none'
+        filter: isHovered ? `brightness(1.2) drop-shadow(0 0 4px ${secondaryColor})` : 'none'
     };
 
     return (
         <div
             className={className}
             style={buttonStyle}
-            onClick={isEnabled ? onClick : null}
+            onClick={onClick}
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
             title={showTooltip ? tooltipText : undefined}
         >
             <img
-                src={backIcon}
-                alt="Previous"
+                src={soundSettingsIcon}
+                alt="Audio Device Settings"
                 style={iconStyle}
                 draggable={false}
             />
@@ -66,4 +67,4 @@ const PreviousButton = ({
     );
 };
 
-export default PreviousButton;
+export default AudioDeviceButton;

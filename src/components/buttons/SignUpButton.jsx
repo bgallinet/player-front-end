@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
 import { Button } from 'react-bootstrap';
-import { Subtitle, Text } from './StyledComponents';
-import { secondaryColor } from './DisplaySettings';
+import { Subtitle, Text } from '../../utils/StyledComponents';
+import { secondaryColor } from '../../utils/DisplaySettings';
 import CloseButton from './CloseButton';
-import PrivacyNoticeAnnex from '../components/PrivacyNoticeAnnex';
-import TermsOfUseAnnex from '../components/TermsOfUseAnnex';
-import { initiateLogin } from './Auth';
-import AnalyticsAPI from './AnalyticsAPI';
-import { getSessionNameFromUrl } from '../hooks/sessionUtils';
-import { isDemoSession, getDemoUsername } from '../hooks/demoUserManager';
-import { fetchExperiment } from '../hooks/useExperiment';
+import PrivacyNoticeAnnex from '../PrivacyNoticeAnnex';
+import TermsOfUseAnnex from '../TermsOfUseAnnex';
+import { initiateLogin } from '../../utils/Auth';
+import AnalyticsAPI from '../../utils/AnalyticsAPI';
+import { getSessionNameFromUrl } from '../../hooks/sessionUtils';
+import { isDemoSession, getDemoUsername } from '../../hooks/demoUserManager';
+import { fetchExperiment } from '../../hooks/useExperiment';
 
 /**
  * SignUpButton Component - Sign Up with Pricing Overlay and Terms

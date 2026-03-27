@@ -1,7 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import homeIcon from '../images/homeIcon.png';
-import playerIcon from '../images/playerIcon.png';
 import logo from '../images/logo.png';
 import { secondaryColor } from '../utils/DisplaySettings';
 import { Nav, Image, Dropdown } from 'react-bootstrap';
@@ -104,7 +103,6 @@ function Navigation() {
                     maxWidth: '40rem'
                 }}>
                     {renderLink("/", "Home", homeIcon)}
-                    {renderLink("/player", "Player", playerIcon)}
                     
 
                     {/* Dropdown menu */}

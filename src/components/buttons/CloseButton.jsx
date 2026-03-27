@@ -1,6 +1,6 @@
 import React from 'react';
 import { Button } from 'react-bootstrap';
-import { secondaryColor } from './DisplaySettings';
+import { secondaryColor } from '../../utils/DisplaySettings';
 
 const CloseButton = ({ 
     onClick, 

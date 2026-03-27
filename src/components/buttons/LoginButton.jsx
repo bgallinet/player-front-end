@@ -1,6 +1,6 @@
 import React from 'react';
 import { Button } from 'react-bootstrap';
-import { initiateLogin } from './Auth';
+import { initiateLogin } from '../../utils/Auth';
 
 /**
  * LoginButton Component - Direct Login to Cognito

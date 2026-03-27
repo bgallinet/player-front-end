@@ -1,11 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Image, Button } from 'react-bootstrap';
-import { Subtitle } from '../utils/StyledComponents';
 import Player from '../components/player/Player';
-import TrackChoice from '../components/player/TrackChoice';
+import TrackChoice from '../library_panels/TrackChoice';
 import EvaluationForm from '../components/EvaluationForm';
-import LargeTutorialButton from '../utils/LargeTutorialButton';
-import SignUpButton from '../utils/SignUpButton';
+import LargeTutorialButton from '../components/buttons/LargeTutorialButton';
+import SignUpButton from '../components/buttons/SignUpButton';
 import { useAuth } from '../contexts/AuthContext';
 import { useTutorial } from '../contexts/TutorialContext';
 import magicPlayerImage from '../images/magicplayer.png';
@@ -141,6 +140,7 @@ const DemoPlayerPage = () => {
             audioRef={audioRef}
             onMusicPlay={handleMusicPlay}
             onMusicPause={handleMusicPause}
+            fallbackDeckArtworkSrc={magicPlayerImage}
         >
             {/* Welcome Image - Only show when no file is selected */}
             {!selectedFile && (

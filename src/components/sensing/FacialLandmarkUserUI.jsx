@@ -11,7 +11,7 @@ import { uploadDetectionData, shouldUpload, clearArrays } from './detectionUploa
 import NoddingCalculator from './NoddingCalculator.jsx';
 import { noddingAnalysisWindow, thresholdForVisualizationOfNodding, thresholdForVisualizationOfSmiling, thresholdForVisualizationOfJawOpen, landmarkDataUploadInterval } from '../../utils/DisplaySettings.jsx';
 import { DATA_COLLECTION_WINDOW } from '../../hooks/ReactionMapperConfig';
-import PlayPauseButton from '../../utils/PlayPauseButton.jsx';
+import PlayPauseButton from '../buttons/PlayPauseButton';
 import LandmarkWebSocket from '../../hooks/LandmarkWebSocket';
 
 
@@ -26,7 +26,11 @@ const FacialLandmarkUserUI = ({
     is_demo_session, 
     demo_username,
     sessionName,
-    sizeMode = 'small' // 'small' (default) or 'large'
+    sizeMode = 'small', // 'small' (default) or 'large'
+    /** Increments from parent (e.g. user pressed Play) to start detection if not already running */
+    autoStartLandmarkTick = 0,
+    /** Increments from parent (e.g. audio Stop) to stop detection if currently running */
+    forceStopDetectionTick = 0
 }) => {
     // State management
     const videoRef = useRef(null);
@@ -419,6 +423,44 @@ const FacialLandmarkUserUI = ({
             setWsUploadConnected(false);
         }
     };
+
+    const lastProcessedAutoStartTickRef = useRef(0);
+
+    useEffect(() => {
+        if (!autoStartLandmarkTick) {
+            return;
+        }
+        if (autoStartLandmarkTick <= lastProcessedAutoStartTickRef.current) {
+            return;
+        }
+        if (scan) {
+            lastProcessedAutoStartTickRef.current = autoStartLandmarkTick;
+            return;
+        }
+        if (!isModelLoaded || !faceLandmarkerRef.current || !detectorInitialized || modelError) {
+            return;
+        }
+        lastProcessedAutoStartTickRef.current = autoStartLandmarkTick;
+        void handleLandmarkDetection();
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- handleLandmarkDetection toggles scan; intentional tick-only trigger
+    }, [autoStartLandmarkTick, scan, isModelLoaded, detectorInitialized, modelError]);
+
+    const lastProcessedForceStopTickRef = useRef(0);
+
+    useEffect(() => {
+        if (!forceStopDetectionTick) {
+            return;
+        }
+        if (forceStopDetectionTick <= lastProcessedForceStopTickRef.current) {
+            return;
+        }
+        lastProcessedForceStopTickRef.current = forceStopDetectionTick;
+        if (!scan) {
+            return;
+        }
+        void handleLandmarkDetection();
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- same toggle pattern as auto-start
+    }, [forceStopDetectionTick, scan]);
 
     // Landmark detection function
     const runLandmarkDetection = async (

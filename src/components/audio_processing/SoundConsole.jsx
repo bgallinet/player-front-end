@@ -49,6 +49,18 @@ import maxSoundIcon from '../../images/maxsoundicon.png';
 import minSoundIcon from '../../images/minsoundicon.png';
 import EQ from './EQ';
 import AudioEffect from './AudioEffect';
+import {
+    createKeyShiftProcessor,
+    processKeyShift,
+    clampKeyShiftSemitones,
+    KEY_SHIFT_SEMITONE_MIN,
+    KEY_SHIFT_SEMITONE_MAX,
+    // Aliased so the local `applyBpmShift` callback (soundConsoleMethods) does not shadow this import.
+    applyBpmShift as applyPlaybackTempoToMedia,
+    clampBpmShiftPercent,
+    BPM_SHIFT_PERCENT_MIN,
+    BPM_SHIFT_PERCENT_MAX,
+} from './audioEffects';
 
 const SoundConsole = ({
     audioRef,
@@ -65,6 +77,9 @@ const SoundConsole = ({
     const audioContextRef = useRef(null);
     const sourceNodeRef = useRef(null);
     const gainNodeRef = useRef(null);
+    const pitchShiftNodeRef = useRef(null);
+    const keyShiftSemitonesRef = useRef(0);
+    const bpmShiftPercentRef = useRef(0);
 
     // EQ state
     const [eqGains, setEqGains] = useState([0, 0, 0, 0, 0, 0]);
@@ -74,6 +89,8 @@ const SoundConsole = ({
     
     const [reverbAmount, setReverbAmount] = useState(0);
     const [delayAmount, setDelayAmount] = useState(0);
+    const [keyShiftSemitones, setKeyShiftSemitones] = useState(0);
+    const [bpmShiftPercent, setBpmShiftPercent] = useState(0);
     const [currentRecommendation, setCurrentRecommendation] = useState(null);
     
 
@@ -85,7 +102,7 @@ const SoundConsole = ({
     const lastThrottleLogTime = useRef(0);
     const THROTTLE_LOG_INTERVAL_MS = 5000; // Only log throttling message every 5 seconds
 
-    // Reconnect audio graph - always include reverb and rhythmic enhancer in chain
+    // Reconnect audio graph - include key shift, EQ, delay, reverb and rhythmic enhancer in chain
     const reconnectAudioGraph = useCallback(() => {
         const now = Date.now();
         if (now - lastReconnectionTime.current < RECONNECTION_THROTTLE_MS) {
@@ -104,8 +121,14 @@ const SoundConsole = ({
             sourceNodeRef.current.disconnect();
             gainNodeRef.current.disconnect();
             
-            // Reconnect the chain: Source -> EQ Filters -> Delay -> Reverb -> Rhythmic Enhancer -> Gain -> Destination
+            // Reconnect the chain: Source -> PitchShift -> EQ Filters -> Delay -> Reverb -> Rhythmic Enhancer -> Gain -> Destination
             let currentNode = sourceNodeRef.current;
+
+            // Connect pitch shift node if available
+            if (pitchShiftNodeRef.current) {
+                currentNode.connect(pitchShiftNodeRef.current);
+                currentNode = pitchShiftNodeRef.current;
+            }
             
             // Connect EQ filters if they exist
             if (audioRef.current && audioRef.current.eqMethods && audioRef.current.eqMethods.filtersRef && audioRef.current.eqMethods.filtersRef.current) {
@@ -171,6 +194,8 @@ const SoundConsole = ({
             } catch (fallbackError) {
                 // Fallback audio connection also failed
             }
+        } finally {
+            applyPlaybackTempoToMedia(audioRef.current, bpmShiftPercentRef.current);
         }
     }, []); // Remove dependencies to prevent unnecessary reconnections
 
@@ -251,6 +276,10 @@ const SoundConsole = ({
                 // Create gain node for master volume
                 gainNodeRef.current = audioContextRef.current.createGain();
                 gainNodeRef.current.gain.value = volume; // Set initial volume
+
+                pitchShiftNodeRef.current = createKeyShiftProcessor(audioContextRef.current);
+                processKeyShift(pitchShiftNodeRef.current, keyShiftSemitonesRef.current);
+                applyPlaybackTempoToMedia(audioRef.current, bpmShiftPercentRef.current);
                 
                 // Initial audio graph connection (delayed to ensure EQ component is ready)
                 setTimeout(() => {
@@ -327,6 +356,38 @@ const SoundConsole = ({
     const handleDelayAmountChange = useCallback((newAmount) => {
         setDelayAmount(newAmount);
     }, []);
+
+    const handleKeyShiftChange = useCallback((newSemitoneValue) => {
+        const clampedSemitones = clampKeyShiftSemitones(newSemitoneValue);
+        if (clampedSemitones === null) return;
+        keyShiftSemitonesRef.current = clampedSemitones;
+        setKeyShiftSemitones(clampedSemitones);
+        processKeyShift(pitchShiftNodeRef.current, clampedSemitones);
+    }, []);
+
+    const handleBpmShiftChange = useCallback((newBpmShiftPercent) => {
+        const clampedBpmPercent = clampBpmShiftPercent(newBpmShiftPercent);
+        if (clampedBpmPercent === null) return;
+        bpmShiftPercentRef.current = clampedBpmPercent;
+        setBpmShiftPercent(clampedBpmPercent);
+        applyPlaybackTempoToMedia(audioRef.current, clampedBpmPercent);
+    }, [audioRef]);
+
+    // HLS / buffer swaps and some browsers reset playbackRate; keep element in sync.
+    useEffect(() => {
+        const el = audioRef.current;
+        if (!el) return undefined;
+        const sync = () => applyPlaybackTempoToMedia(el, bpmShiftPercentRef.current);
+        el.addEventListener('loadeddata', sync);
+        el.addEventListener('canplay', sync);
+        el.addEventListener('play', sync);
+        sync();
+        return () => {
+            el.removeEventListener('loadeddata', sync);
+            el.removeEventListener('canplay', sync);
+            el.removeEventListener('play', sync);
+        };
+    }, [audioRef]);
 
     // Apply external EQ values (no emotion interpretation - just apply the provided EQ vector)
     const applyExternalEQ = useCallback((eqVector) => {
@@ -597,6 +658,15 @@ const SoundConsole = ({
         // No need for centralized logic here - let components be responsible for their own behavior
     }, []);
 
+    // Apply external key shift (for future external controls/mappings)
+    const applyKeyShift = useCallback((semitones) => {
+        handleKeyShiftChange(semitones);
+    }, [handleKeyShiftChange]);
+
+    const applyBpmShift = useCallback((bpmPercent) => {
+        handleBpmShiftChange(bpmPercent);
+    }, [handleBpmShiftChange]);
+
     // Handle volume recommendations
     useEffect(() => {
         if (currentRecommendation) {
@@ -612,6 +682,19 @@ const SoundConsole = ({
         }
     }, [currentRecommendation, applyEmotionVolume, resetToBaseValues]);
 
+    // Key / BPM from reaction mapper (manual mapping per emotion)
+    useEffect(() => {
+        if (!currentRecommendation) {
+            handleKeyShiftChange(0);
+            handleBpmShiftChange(0);
+            return;
+        }
+        const semitones = Number(currentRecommendation.keyShiftSemitones);
+        const bpmPct = Number(currentRecommendation.bpmShiftPercent);
+        handleKeyShiftChange(Number.isFinite(semitones) ? semitones : 0);
+        handleBpmShiftChange(Number.isFinite(bpmPct) ? bpmPct : 0);
+    }, [currentRecommendation, handleKeyShiftChange, handleBpmShiftChange]);
+
     // Expose methods to parent component
     useEffect(() => {
         if (audioRef.current) {
@@ -620,6 +703,8 @@ const SoundConsole = ({
                 initializeAudioContext,
                 applyExternalEQ,
                 applyEmotionVolume,
+                applyKeyShift,
+                applyBpmShift,
                 resetEQ,
                 resetToBaseValues,
                 reconnectAudioGraph: reconnectAudioGraphManual,
@@ -630,7 +715,7 @@ const SoundConsole = ({
             // Expose audioContextRef for mobile resume functionality
             audioRef.current.audioContextRef = audioContextRef;
         }
-    }, [initializeAudioContext, applyExternalEQ, applyEmotionVolume, resetEQ, resetToBaseValues, reconnectAudioGraphManual, applyRecommendation, forceAllEffectsCreation]);
+    }, [initializeAudioContext, applyExternalEQ, applyEmotionVolume, applyKeyShift, applyBpmShift, resetEQ, resetToBaseValues, reconnectAudioGraphManual, applyRecommendation, forceAllEffectsCreation]);
 
 
     return (
@@ -689,6 +774,61 @@ const SoundConsole = ({
                 onResetEQ={resetEQ}
                 recommendation={currentRecommendation}
             />
+
+            {/* Key Shift (Pitch) Control */}
+            <div className="mt-4 mb-4">
+                <div className="d-flex align-items-center justify-content-between mb-2">
+                    <Subtitle style={{ margin: 0 }}>Key Shift</Subtitle>
+                    <div className="d-flex gap-2 align-items-center">
+                        <Text style={{ margin: 0, fontSize: '0.9rem', color: secondaryColor, fontWeight: 'bold' }}>
+                            {keyShiftSemitones === 0 ? 'Original' : `${keyShiftSemitones > 0 ? '+' : ''}${keyShiftSemitones} st`}
+                        </Text>
+                    </div>
+                </div>
+                <div className="d-flex align-items-center gap-3">
+                    <span style={{ fontSize: '0.8rem', whiteSpace: 'nowrap' }}>-12</span>
+                    <Form.Range
+                        min="-12"
+                        max="12"
+                        step="1"
+                        value={keyShiftSemitones}
+                        onChange={(e) => handleKeyShiftChange(e.target.value)}
+                        style={{
+                            flex: 1,
+                            background: `linear-gradient(to right, #333 0%, #333 ${((keyShiftSemitones + 12) / 24) * 100}%, ${secondaryColor} ${((keyShiftSemitones + 12) / 24) * 100}%, ${secondaryColor} 100%)`
+                        }}
+                    />
+                    <span style={{ fontSize: '0.8rem', whiteSpace: 'nowrap' }}>+12</span>
+                </div>
+            </div>
+
+            {/* BPM / Tempo Control */}
+            <div className="mt-4 mb-4">
+                <div className="d-flex align-items-center justify-content-between mb-2">
+                    <Subtitle style={{ margin: 0 }}>BPM Shift</Subtitle>
+                    <div className="d-flex gap-2 align-items-center">
+                        <Text style={{ margin: 0, fontSize: '0.9rem', color: secondaryColor, fontWeight: 'bold' }}>
+                            {bpmShiftPercent === 0 ? 'Original' : `${bpmShiftPercent > 0 ? '+' : ''}${bpmShiftPercent}%`}
+                        </Text>
+                    </div>
+                </div>
+                <div className="d-flex align-items-center gap-3">
+                    <span style={{ fontSize: '0.8rem', whiteSpace: 'nowrap' }}>{BPM_SHIFT_PERCENT_MIN}%</span>
+                    <Form.Range
+                        min={BPM_SHIFT_PERCENT_MIN}
+                        max={BPM_SHIFT_PERCENT_MAX}
+                        step="1"
+                        value={bpmShiftPercent}
+                        onChange={(e) => handleBpmShiftChange(e.target.value)}
+                        onInput={(e) => handleBpmShiftChange(e.target.value)}
+                        style={{
+                            flex: 1,
+                            background: `linear-gradient(to right, #333 0%, #333 ${((bpmShiftPercent - BPM_SHIFT_PERCENT_MIN) / (BPM_SHIFT_PERCENT_MAX - BPM_SHIFT_PERCENT_MIN)) * 100}%, ${secondaryColor} ${((bpmShiftPercent - BPM_SHIFT_PERCENT_MIN) / (BPM_SHIFT_PERCENT_MAX - BPM_SHIFT_PERCENT_MIN)) * 100}%, ${secondaryColor} 100%)`
+                        }}
+                    />
+                    <span style={{ fontSize: '0.8rem', whiteSpace: 'nowrap' }}>+{BPM_SHIFT_PERCENT_MAX}%</span>
+                </div>
+            </div>
 
             {/* Compression removed */}
 

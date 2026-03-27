@@ -26,9 +26,9 @@
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Button, Form, Alert, Spinner } from 'react-bootstrap';
-import { Subtitle, Text } from '../../utils/StyledComponents';
-import { secondaryColor } from '../../utils/DisplaySettings';
-import ExpandReduceButton from '../../utils/ExpandReduceButton';
+import { Subtitle, Text } from '../utils/StyledComponents';
+import { secondaryColor } from '../utils/DisplaySettings';
+import ExpandReduceButton from '../components/buttons/ExpandReduceButton';
 
 const MusicLibraryPanel = ({ show, onHide, onFileSelect, onAddToPlaylist, onFolderLoaded, isDemoSession = false, musicFiles = [], playlist = [] }) => {
     const [currentPath, setCurrentPath] = useState('');

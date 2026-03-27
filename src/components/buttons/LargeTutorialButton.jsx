@@ -1,7 +1,7 @@
 import React from 'react';
 import { Button } from 'react-bootstrap';
-import { useTutorial } from '../contexts/TutorialContext';
-import tutorialIcon from '../images/tutorialicon.png';
+import { useTutorial } from '../../contexts/TutorialContext';
+import tutorialIcon from '../../images/tutorialicon.png';
 
 const LargeTutorialButton = ({ onTutorialToggle, disabled = false, style = {} }) => {
     const { isTutorialMode, toggleTutorialMode } = useTutorial();

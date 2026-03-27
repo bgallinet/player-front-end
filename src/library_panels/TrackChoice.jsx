@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Button, Alert } from 'react-bootstrap';
-import { Text, Subtitle } from '../../utils/StyledComponents';
-import { secondaryColor } from '../../utils/DisplaySettings';
+import { Text, Subtitle } from '../utils/StyledComponents';
+import { secondaryColor } from '../utils/DisplaySettings';
 
 // Demo tracks configuration
 const DEMO_TRACKS = [

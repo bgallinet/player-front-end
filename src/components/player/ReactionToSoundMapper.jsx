@@ -147,6 +147,28 @@ export const DEFAULT_DELAY_MAPPINGS = {
     'neutral': 0
 };
 
+/** Per-emotion key shift in semitones (−12 … +12); 0 = no change */
+export const DEFAULT_KEY_SHIFT_MAPPINGS = {
+    'nodding+happy': 0,
+    'nodding+surprised': 0,
+    'nodding+neutral': 0,
+    'handsRaised': 0,
+    'happy': 0,
+    'surprised': 0,
+    'neutral': 0
+};
+
+/** Per-emotion BPM shift in percent (−50 … +50); 0 = no change */
+export const DEFAULT_BPM_SHIFT_MAPPINGS = {
+    'nodding+happy': 0,
+    'nodding+surprised': 0,
+    'nodding+neutral': 0,
+    'handsRaised': 0,
+    'happy': 0,
+    'surprised': 0,
+    'neutral': 0
+};
+
 
 const ReactionToSoundMapper = ({
     // Reaction data (all values are NUMERIC)
@@ -166,6 +188,8 @@ const ReactionToSoundMapper = ({
     rhythmicEnhancementMappings = {}, // Emotion state -> Rhythmic enhancement percentage (number, 0-100 range)
     reverbMappings = {},              // Emotion state -> Reverb percentage (number, 0-100 range)
     delayMappings = {},               // Emotion state -> Delay percentage (number, 0-100 range)
+    keyShiftMappings = {},            // Emotion state -> Key shift in semitones (integer, typically −12…+12)
+    bpmShiftMappings = {},           // Emotion state -> BPM shift in percent (integer, typically −50…+50)
     
     // Configuration
     analysisWindowMs = EMOTION_ANALYSIS_WINDOW,          // Time window for analysis (ms)
@@ -318,6 +342,8 @@ const ReactionToSoundMapper = ({
         const rhythmicEnhancement = rhythmicEnhancementMappings[emotionState];
         const reverbAmount = reverbMappings[emotionState];
         const delayAmount = delayMappings[emotionState];
+        const keyShiftSemitones = keyShiftMappings[emotionState] ?? 0;
+        const bpmShiftPercent = bpmShiftMappings[emotionState] ?? 0;
         
         
         // For UI compatibility, determine the preset keyword
@@ -343,6 +369,8 @@ const ReactionToSoundMapper = ({
             rhythmicEnhancement: rhythmicEnhancement,
             reverbAmount: reverbAmount,
             delayAmount: delayAmount,
+            keyShiftSemitones,
+            bpmShiftPercent,
             
             // Metadata
             timestamp: Date.now(),
@@ -390,7 +418,9 @@ const ReactionToSoundMapper = ({
                Math.abs((newRec.noddingAmplitude || 0) - (oldRec.noddingAmplitude || 0)) > THRESHOLD_NODDING || // More sensitive to nodding changes
                Math.abs((newRec.rhythmicEnhancement || 0) - (oldRec.rhythmicEnhancement || 0)) > 0.01 || // Check rhythmic enhancement changes
                Math.abs((newRec.reverbAmount || 0) - (oldRec.reverbAmount || 0)) > 0.01 || // Check reverb changes
-               Math.abs((newRec.delayAmount || 0) - (oldRec.delayAmount || 0)) > 0.01; // Check delay changes
+               Math.abs((newRec.delayAmount || 0) - (oldRec.delayAmount || 0)) > 0.01 || // Check delay changes
+               Math.abs((newRec.keyShiftSemitones ?? 0) - (oldRec.keyShiftSemitones ?? 0)) > 0.01 ||
+               Math.abs((newRec.bpmShiftPercent ?? 0) - (oldRec.bpmShiftPercent ?? 0)) > 0.01;
     }, []);
     
     /**

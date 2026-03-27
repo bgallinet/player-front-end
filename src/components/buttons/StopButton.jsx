@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { secondaryColor } from './DisplaySettings';
-import stopIcon from '../images/stopicon.png';
+import { secondaryColor } from '../../utils/DisplaySettings';
+import stopIcon from '../../images/stopicon.png';
 
 const StopButton = ({
     onClick,
@@ -26,6 +26,10 @@ const StopButton = ({
     const buttonStyle = {
         width: size,
         height: size,
+        minWidth: size,
+        minHeight: size,
+        boxSizing: 'border-box',
+        flexShrink: 0,
         cursor: isEnabled ? 'pointer' : 'not-allowed',
         opacity: isEnabled ? (isHovered ? 0.8 : 1) : 0.3,
         userSelect: 'none',

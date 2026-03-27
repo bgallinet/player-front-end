@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { useTutorial } from '../contexts/TutorialContext';
-import { secondaryColor } from './DisplaySettings';
-import tutorialIcon from '../images/tutorialicon.png';
+import { useTutorial } from '../../contexts/TutorialContext';
+import { secondaryColor } from '../../utils/DisplaySettings';
+import tutorialIcon from '../../images/tutorialicon.png';
 
 /**
  * TutorialButton Component
@@ -62,6 +62,10 @@ const TutorialButton = ({
     const buttonStyle = {
         width: size,
         height: size,
+        minWidth: size,
+        minHeight: size,
+        boxSizing: 'border-box',
+        flexShrink: 0,
         cursor: disabled || (isTutorialMode && !tutorialDismissed) ? 'not-allowed' : 'pointer',
         opacity: isHovered ? 0.8 : (disabled || (isTutorialMode && !tutorialDismissed) ? 0.5 : 1),
         userSelect: 'none',

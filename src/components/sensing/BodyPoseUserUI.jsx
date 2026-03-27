@@ -8,7 +8,7 @@ import { PoseLandmarker, FilesetResolver } from '@mediapipe/tasks-vision';
 import BodyPoseDrawing from '../animations/BodyPoseDrawing';
 import OrientedCamera from '../OrientedCamera';
 import { uploadDetectionData, shouldUpload, clearArrays } from './detectionUploader';
-import PlayPauseButton from '../../utils/PlayPauseButton.jsx';
+import PlayPauseButton from '../buttons/PlayPauseButton';
 import LandmarkWebSocket from '../../hooks/LandmarkWebSocket';
 import HandRaiseCalculator from './HandRaiseCalculator';
 
@@ -21,7 +21,9 @@ const BodyPoseUserUI = ({
     is_demo_session, 
     demo_username,
     sessionName,
-    sizeMode = 'small' // 'small' (default) or 'large'
+    sizeMode = 'small', // 'small' (default) or 'large'
+    /** Increments from parent (e.g. audio Stop) to stop detection if currently running */
+    forceStopDetectionTick = 0
 }) => {
     // State management
     const videoRef = useRef(null);
@@ -246,6 +248,23 @@ const BodyPoseUserUI = ({
             setWsUploadConnected(false);
         }
     };
+
+    const lastProcessedForceStopTickRef = useRef(0);
+
+    useEffect(() => {
+        if (!forceStopDetectionTick) {
+            return;
+        }
+        if (forceStopDetectionTick <= lastProcessedForceStopTickRef.current) {
+            return;
+        }
+        lastProcessedForceStopTickRef.current = forceStopDetectionTick;
+        if (!scan) {
+            return;
+        }
+        void handlePoseDetection();
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional tick sync from parent
+    }, [forceStopDetectionTick, scan]);
 
     // Pose detection function
     const runPoseDetection = async (poseArray, timeStampArray, confidenceArray) => {

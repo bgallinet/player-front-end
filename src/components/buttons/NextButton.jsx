@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { secondaryColor } from './DisplaySettings';
-import nextIcon from '../images/nexticon.png';
+import { secondaryColor } from '../../utils/DisplaySettings';
+import nextIcon from '../../images/nexticon.png';
 
 const NextButton = ({
     onClick,
@@ -26,6 +26,10 @@ const NextButton = ({
     const buttonStyle = {
         width: size,
         height: size,
+        minWidth: size,
+        minHeight: size,
+        boxSizing: 'border-box',
+        flexShrink: 0,
         cursor: isEnabled ? 'pointer' : 'not-allowed',
         opacity: isEnabled ? (isHovered ? 0.8 : 1) : 0.3,
         userSelect: 'none',

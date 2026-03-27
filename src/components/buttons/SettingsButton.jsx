@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { secondaryColor } from './DisplaySettings';
-import settingsIcon from '../images/settingsicon.png';
+import { secondaryColor } from '../../utils/DisplaySettings';
+import settingsIcon from '../../images/settingsicon.png';
 
 /**
  * SettingsButton Component
@@ -57,6 +57,10 @@ const SettingsButton = ({
     const buttonStyle = {
         width: size,
         height: size,
+        minWidth: size,
+        minHeight: size,
+        boxSizing: 'border-box',
+        flexShrink: 0,
         cursor: disabled ? 'not-allowed' : 'pointer',
         opacity: isHovered ? 0.8 : (disabled ? 0.5 : 1),
         userSelect: 'none',

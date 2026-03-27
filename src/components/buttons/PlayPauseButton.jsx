@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { secondaryColor } from './DisplaySettings';
-import playIcon from '../images/playicon.png';
-import pauseIcon from '../images/pauseicon.png';
+import { secondaryColor } from '../../utils/DisplaySettings';
+import playIcon from '../../images/playicon.png';
+import pauseIcon from '../../images/pauseicon.png';
 
 const PlayPauseButton = ({
     onClick,
@@ -28,6 +28,10 @@ const PlayPauseButton = ({
     const buttonStyle = {
         width: size,
         height: size,
+        minWidth: size,
+        minHeight: size,
+        boxSizing: 'border-box',
+        flexShrink: 0,
         cursor: isEnabled ? 'pointer' : 'not-allowed',
         opacity: isEnabled ? (isHovered ? 0.8 : 1) : 0.3,
         userSelect: 'none',
