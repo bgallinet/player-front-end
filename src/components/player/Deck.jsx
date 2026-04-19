@@ -24,9 +24,18 @@ const Deck = ({
     reverbMappings,
     noddingAmplitude,
     children,
-    consoleZIndex = 1045
+    consoleZIndex = 1045,
+    /** Top-right control opens mappings (not the sound console). */
+    onOpenMappings,
+    /** Optional controlled sound console visibility (used when opening console from deck toolbar). */
+    soundConsoleOpen: soundConsoleOpenProp,
+    onSoundConsoleOpenChange
 }) => {
-    const [consoleOpen, setConsoleOpen] = useState(false);
+    const [consoleOpenInternal, setConsoleOpenInternal] = useState(false);
+    const isConsoleControlled =
+        soundConsoleOpenProp !== undefined && typeof onSoundConsoleOpenChange === 'function';
+    const consoleOpen = isConsoleControlled ? soundConsoleOpenProp : consoleOpenInternal;
+    const setConsoleOpen = isConsoleControlled ? onSoundConsoleOpenChange : setConsoleOpenInternal;
     const [isNarrowViewport, setIsNarrowViewport] = useState(
         () =>
             typeof window !== 'undefined' &&
@@ -91,10 +100,14 @@ const Deck = ({
                         variant="outline-light"
                         size="sm"
                         type="button"
-                        onClick={() => setConsoleOpen((o) => !o)}
+                        onClick={() => {
+                            if (onOpenMappings) {
+                                onOpenMappings();
+                            }
+                        }}
                         style={{ borderColor: secondaryColor }}
                     >
-                        {consoleOpen ? 'Hide sound console' : 'Sound console'}
+                        Mappings
                     </Button>
                 </div>
                 {children}

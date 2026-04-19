@@ -4,8 +4,6 @@ import homeIcon from '../images/homeIcon.png';
 import logo from '../images/logo.png';
 import { secondaryColor } from '../utils/DisplaySettings';
 import { Nav, Image, Dropdown } from 'react-bootstrap';
-import { useAuth } from '../contexts/AuthContext';
-import { isDemoSession } from '../hooks/demoUserManager';
 
 /**
  * Navigation Component
@@ -30,8 +28,6 @@ import { isDemoSession } from '../hooks/demoUserManager';
 
 
 function Navigation() {
-    const { idToken } = useAuth();
-    const isDemoSessionValue = isDemoSession();
     // Render a link with a label and an icon
     const renderLink = (path, label, icon) => (
         <Link 
@@ -40,7 +36,7 @@ function Navigation() {
             style={{ 
                 whiteSpace: 'nowrap',
                 padding: '0.25rem',
-                flex: '1 1 0',
+                flex: '0 1 auto',
                 minWidth: 0
             }}
         >
@@ -84,7 +80,7 @@ function Navigation() {
     return (
         <>
             <Nav 
-                className="d-flex flex-row align-items-center bg-black fixed-top w-100 py-0"
+                className="d-flex flex-row align-items-center justify-content-between bg-black fixed-top w-100 py-0 px-2 px-md-3"
                 style={{
                     zIndex: 1000,
                     borderBottom: '0.125rem solid',
@@ -95,18 +91,16 @@ function Navigation() {
                 <Image 
                     src={logo} 
                     alt="Logo" 
-                    className="d-none d-lg-block me-lg-3"
+                    className="d-none d-lg-block flex-shrink-0 me-2 me-lg-3"
                     style={{ width: 'clamp(8rem, 10vw, 12rem)' }}
                 />
                 
-                <div className="d-flex flex-row align-items-center w-100 w-md-auto justify-content-between px-2 px-md-4 gap-2" style={{
-                    maxWidth: '40rem'
-                }}>
+                <div className="d-flex flex-row align-items-center flex-grow-1 justify-content-between gap-2 gap-md-3 min-w-0 ms-lg-0">
                     {renderLink("/", "Home", homeIcon)}
                     
 
-                    {/* Dropdown menu */}
-                    <Dropdown className={idToken ? "ms-auto" : ""}>
+                    {/* Dropdown menu — always at far right on tablet / mobile */}
+                    <Dropdown className="flex-shrink-0 ms-2">
                         <Dropdown.Toggle 
                             variant="outline-light"
                             className="d-flex align-items-center justify-content-center"

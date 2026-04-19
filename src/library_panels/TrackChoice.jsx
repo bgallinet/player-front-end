@@ -29,6 +29,15 @@ const DEMO_TRACKS = [
 
 const CLOUDFRONT_URL = 'https://dhuj2x4ippvty.cloudfront.net';
 
+/** Public demo CDN base (CloudFront). */
+export const DEMO_CLOUDFRONT_URL = CLOUDFRONT_URL;
+
+/** Encode object key segments so spaces/special chars match S3 keys in the URL path. */
+export function buildDemoAudioUrl(filename) {
+    if (!filename || filename === 'custom') return '';
+    return `${CLOUDFRONT_URL}/${encodeURIComponent(filename)}`;
+}
+
 const TrackChoice = ({
     onTrackSelect,
     selectedFile,
@@ -49,7 +58,7 @@ const TrackChoice = ({
         }
         
         // Load demo track
-        const DEMO_TRACK_URL = `${CLOUDFRONT_URL}/${track.filename}`;
+        const DEMO_TRACK_URL = buildDemoAudioUrl(track.filename);
         const trackFile = {
             name: `${track.title} - ${track.artist}`,
             url: DEMO_TRACK_URL,

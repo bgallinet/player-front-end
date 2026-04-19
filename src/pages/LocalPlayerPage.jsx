@@ -6,7 +6,7 @@ import { secondaryColor } from '../utils/DisplaySettings';
 import Player from '../components/player/Player';
 import PlaylistCard from '../components/player/PlaylistCard';
 import MusicLibraryPanel from '../library_panels/MusicLibraryPanel';
-import magicPlayerImage from '../images/magicplayer.png';
+import magicPlayerImage from '../images/logo_small.png';
 
 const LocalPlayerPage = () => {
     const [selectedFile, setSelectedFile] = useState(null);
@@ -174,7 +174,7 @@ const LocalPlayerPage = () => {
                 <div className="text-center mb-4">
                     <Image
                         src={magicPlayerImage}
-                        alt="Magic Player"
+                        alt="Player logo"
                         fluid
                         style={{ maxWidth: '100%' }}
                     />

@@ -11,7 +11,7 @@
  * Model weights: full holistic_landmarker float16 from Google storage (`.../latest/...`).
  * The `_lite` artifact path previously used returns 404 from CDN.
  */
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import AnalyticsAPI from '../../utils/AnalyticsAPI.jsx';
 import {
     scanFrequencyLandmark,
@@ -30,6 +30,7 @@ import NoddingCalculator from './NoddingCalculator.jsx';
 import HandRaiseCalculator from './HandRaiseCalculator.jsx';
 import { DATA_COLLECTION_WINDOW } from '../../hooks/ReactionMapperConfig';
 import PlayPauseButton from '../buttons/PlayPauseButton';
+import CloseButton from '../buttons/CloseButton';
 import BodyPoseDrawing from '../animations/BodyPoseDrawing';
 
 const isProduction = process.env.NODE_ENV === 'production';
@@ -137,6 +138,8 @@ const UnifiedSensingUserUI = ({
     const holisticRef = useRef(null);
     const gestureRecognizerRef = useRef(null);
     const [scan, setScan] = useState(false);
+    /** When detection is on, show full-screen overlay until user closes it or stops detection */
+    const [overlayDismissed, setOverlayDismissed] = useState(false);
     const [isModelLoaded, setIsModelLoaded] = useState(false);
     const [modelError, setModelError] = useState(null);
     const [detectorInitialized, setDetectorInitialized] = useState(false);
@@ -168,7 +171,30 @@ const UnifiedSensingUserUI = ({
 
     const detectionInProgressRef = useRef(false);
 
-    const cameraSize = sizeMode === 'large' ? '160px' : '80px';
+    const isOverlayLayout = scan && !overlayDismissed;
+
+    /** Overlay: square fits below nav with room for controls + BPM (no page scroll). */
+    const cameraSize = useMemo(() => {
+        if (isOverlayLayout) {
+            return 'min(70vmin, calc(100dvh - 15rem), calc(100vw - 2rem))';
+        }
+        return sizeMode === 'large' ? '160px' : '80px';
+    }, [isOverlayLayout, sizeMode]);
+
+    useEffect(() => {
+        if (!scan) {
+            setOverlayDismissed(false);
+        }
+    }, [scan]);
+
+    useEffect(() => {
+        if (!isOverlayLayout) return;
+        const prev = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        return () => {
+            document.body.style.overflow = prev;
+        };
+    }, [isOverlayLayout]);
     const unifiedScanMs = Math.min(scanFrequencyLandmark, scanFrequencyPose);
 
     const flushFaceLocalStorage = useCallback(
@@ -855,26 +881,89 @@ const UnifiedSensingUserUI = ({
         }
     }, [isModelLoaded, detectorInitialized, stream]);
 
+    const transportBtnSize = isOverlayLayout
+        ? window.innerWidth < 768
+            ? '3.2rem'
+            : '3.75rem'
+        : window.innerWidth < 768
+          ? '3.2rem'
+          : '4rem';
+
     return (
-        <div style={{ width: '100%', marginBottom: '1rem', display: 'block' }}>
+        <div
+            style={{
+                width: '100%',
+                marginBottom: isOverlayLayout ? 0 : '1rem',
+                display: 'block',
+                ...(isOverlayLayout
+                    ? {
+                          position: 'fixed',
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          top: 'clamp(3.5rem, 5vw, 6rem)',
+                          zIndex: 900,
+                          overflow: 'hidden',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          backgroundColor: '#050505',
+                      }
+                    : {}),
+            }}
+        >
+            {isOverlayLayout && (
+                <div
+                    style={{
+                        position: 'absolute',
+                        top: '0.75rem',
+                        right: '0.75rem',
+                        zIndex: 10,
+                    }}
+                >
+                    <CloseButton
+                        onClick={() => setOverlayDismissed(true)}
+                        aria-label="Close overlay and keep detection in the main window"
+                    />
+                </div>
+            )}
             <div
                 className={`${embeddingTW ? 'twitch-embed-page' : ''}`}
                 style={{
                     backgroundColor: '#000',
-                    padding: window.innerWidth < 768 ? '0.5rem' : '1rem',
-                    borderRadius: '0.5rem',
+                    padding: isOverlayLayout
+                        ? '0.5rem 0.75rem 0.75rem'
+                        : window.innerWidth < 768
+                          ? '0.5rem'
+                          : '1rem',
+                    borderRadius: isOverlayLayout ? 0 : '0.5rem',
                     width: '100%',
+                    minHeight: isOverlayLayout ? 0 : undefined,
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
+                    justifyContent: isOverlayLayout ? 'center' : 'flex-start',
+                    flex: isOverlayLayout ? 1 : undefined,
+                    boxSizing: 'border-box',
+                    overflow: isOverlayLayout ? 'hidden' : undefined,
                 }}
             >
-                <div className="d-flex flex-column align-items-center gap-2">
-                    <div className="d-flex align-items-center justify-content-center gap-2">
+                <div
+                    className="d-flex flex-column align-items-center"
+                    style={{
+                        gap: isOverlayLayout ? '0.35rem' : '0.5rem',
+                        flex: isOverlayLayout ? 1 : undefined,
+                        minHeight: isOverlayLayout ? 0 : undefined,
+                        justifyContent: isOverlayLayout ? 'center' : undefined,
+                        width: '100%',
+                        maxHeight: isOverlayLayout ? '100%' : undefined,
+                    }}
+                >
+                    <div className="d-flex align-items-center justify-content-center gap-2 flex-wrap">
                         <PlayPauseButton
                             onClick={() => void handleToggle()}
                             isPlaying={scan}
-                            size={window.innerWidth < 768 ? '3.2rem' : '4rem'}
+                            size={transportBtnSize}
+                            tooltipText={scan ? 'Stop detection' : 'Start detection'}
                             isEnabled={
                                 isModelLoaded &&
                                 detectorInitialized &&
@@ -882,8 +971,8 @@ const UnifiedSensingUserUI = ({
                                 (localStorage.getItem('idToken') || is_demo_session)
                             }
                             style={{
-                                width: window.innerWidth < 768 ? '3.2rem' : '4rem',
-                                height: window.innerWidth < 768 ? '3.2rem' : '4rem',
+                                width: transportBtnSize,
+                                height: transportBtnSize,
                             }}
                         />
                         {scan && (
