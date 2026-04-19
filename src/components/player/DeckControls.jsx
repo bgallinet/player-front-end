@@ -1,8 +1,9 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Spinner } from 'react-bootstrap';
 import { Text } from '../../utils/StyledComponents';
 import { secondaryColor } from '../../utils/DisplaySettings';
 import { usePointerSlide1D } from '../../hooks/usePointerSlide1D';
+import defaultDeckArtwork from '../../images/logo_small.png';
 import AudioDeviceButton from '../buttons/AudioDeviceButton';
 import SettingsButton from '../buttons/SettingsButton';
 import TutorialButton from '../buttons/TutorialButton';
@@ -32,12 +33,12 @@ export const DeckControls = ({
     onLoadTrack = noop,
     iconSize = '2.1rem',
     showPreviousNext = true,
-    /** Utility row below transport (audio device, mappings, tutorial) */
+    /** Utility row below transport (audio device, sound console, tutorial) */
     showAudioDevice = false,
-    showEmotionMapping = false,
+    showSoundConsole = false,
     showTutorial = false,
     onAudioDeviceClick,
-    onEmotionMappingClick,
+    onSoundConsoleClick,
     tutorialDismissed,
     setTutorialDismissed,
     /** Cover / artwork (URL string), e.g. SoundCloud `artwork_url` */
@@ -47,6 +48,18 @@ export const DeckControls = ({
     trackStatusMessage,
     trackStatusLoading = false
 }) => {
+    const [artworkSrc, setArtworkSrc] = useState(
+        () => artworkUrl || defaultDeckArtwork
+    );
+
+    useEffect(() => {
+        setArtworkSrc(artworkUrl || defaultDeckArtwork);
+    }, [artworkUrl]);
+
+    const handleArtworkError = useCallback(() => {
+        setArtworkSrc((prev) => (prev === defaultDeckArtwork ? prev : defaultDeckArtwork));
+    }, []);
+
     const canPlay = hasValidAudioSource();
 
     const handleProgressSeekFraction = useCallback(
@@ -112,7 +125,7 @@ export const DeckControls = ({
 
     const showUtilityRow =
         (showAudioDevice && onAudioDeviceClick) ||
-        (showEmotionMapping && onEmotionMappingClick) ||
+        (showSoundConsole && onSoundConsoleClick) ||
         (showTutorial && setTutorialDismissed);
 
     return (
@@ -138,12 +151,13 @@ export const DeckControls = ({
                     )}
                 </div>
             )}
-            {artworkUrl && (
+            {artworkSrc && (
                 <div className="text-center" style={{ marginTop: '0.15rem', marginBottom: '0.35rem' }}>
                     <img
-                        src={artworkUrl}
+                        src={artworkSrc}
                         alt=""
                         draggable={false}
+                        onError={handleArtworkError}
                         style={{
                             width: `${artworkSizePx}px`,
                             height: `${artworkSizePx}px`,
@@ -172,77 +186,79 @@ export const DeckControls = ({
                 </Text>
             ) : null}
 
-            <div
-                className="d-flex justify-content-center align-items-center gap-3 mt-2 mb-2 flex-nowrap"
-                style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}
-            >
-                {showPreviousNext && (
-                    <PreviousButton
-                        onClick={onPrevious}
-                        size={iconSize}
-                        showTooltip={true}
-                        tooltipText="Previous"
-                        isEnabled={hasPrevious}
-                    />
-                )}
-                <PlayPauseButton
-                    onClick={onPlayPause}
-                    isPlaying={isPlaying}
-                    size={iconSize}
-                    showTooltip={true}
-                    isEnabled={canPlay}
-                />
-                <StopButton
-                    onClick={onStop}
-                    size={iconSize}
-                    showTooltip={true}
-                    tooltipText="Stop"
-                    isEnabled={canPlay}
-                />
-                {showPreviousNext && (
-                    <NextButton
-                        onClick={onNext}
-                        size={iconSize}
-                        showTooltip={true}
-                        tooltipText="Next"
-                        isEnabled={hasNext}
-                    />
-                )}
-            </div>
-
-            {showUtilityRow && (
+            <div className="deck-controls-actions">
                 <div
-                    className="d-flex justify-content-center align-items-center gap-3 mb-2 flex-nowrap"
+                    className="deck-controls-transport d-flex justify-content-center align-items-center gap-3 flex-nowrap"
                     style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}
                 >
-                    {showAudioDevice && onAudioDeviceClick && (
-                        <AudioDeviceButton
-                            onClick={onAudioDeviceClick}
+                    {showPreviousNext && (
+                        <PreviousButton
+                            onClick={onPrevious}
                             size={iconSize}
                             showTooltip={true}
-                            tooltipText="Audio Device Settings"
+                            tooltipText="Previous"
+                            isEnabled={hasPrevious}
                         />
                     )}
-                    {showEmotionMapping && onEmotionMappingClick && (
-                        <SettingsButton
-                            showSettings={false}
-                            onToggleSettings={onEmotionMappingClick}
+                    <PlayPauseButton
+                        onClick={onPlayPause}
+                        isPlaying={isPlaying}
+                        size={iconSize}
+                        showTooltip={true}
+                        isEnabled={canPlay}
+                    />
+                    <StopButton
+                        onClick={onStop}
+                        size={iconSize}
+                        showTooltip={true}
+                        tooltipText="Stop"
+                        isEnabled={canPlay}
+                    />
+                    {showPreviousNext && (
+                        <NextButton
+                            onClick={onNext}
                             size={iconSize}
                             showTooltip={true}
-                            tooltipText="Emotion-to-Audio Mappings"
-                        />
-                    )}
-                    {showTutorial && setTutorialDismissed && (
-                        <TutorialButton
-                            tutorialDismissed={tutorialDismissed}
-                            setTutorialDismissed={setTutorialDismissed}
-                            size={iconSize}
-                            showTooltip={true}
-                            tooltipText="Tutorial"
+                            tooltipText="Next"
+                            isEnabled={hasNext}
                         />
                     )}
                 </div>
-            )}
+
+                {showUtilityRow && (
+                    <div
+                        className="deck-controls-utilities d-flex justify-content-center align-items-center gap-3 flex-nowrap"
+                        style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}
+                    >
+                        {showAudioDevice && onAudioDeviceClick && (
+                            <AudioDeviceButton
+                                onClick={onAudioDeviceClick}
+                                size={iconSize}
+                                showTooltip={true}
+                                tooltipText="Audio Device Settings"
+                            />
+                        )}
+                    {showSoundConsole && onSoundConsoleClick && (
+                        <SettingsButton
+                            showSettings={false}
+                            onToggleSettings={onSoundConsoleClick}
+                            size={iconSize}
+                            showTooltip={true}
+                            tooltipText="Sound console"
+                        />
+                    )}
+                        {showTutorial && setTutorialDismissed && (
+                            <TutorialButton
+                                tutorialDismissed={tutorialDismissed}
+                                setTutorialDismissed={setTutorialDismissed}
+                                size={iconSize}
+                                showTooltip={true}
+                                tooltipText="Tutorial"
+                            />
+                        )}
+                    </div>
+                )}
+            </div>
 
             <div
                 ref={progressBoundsRef}

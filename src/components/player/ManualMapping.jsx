@@ -5,7 +5,7 @@
  * allowing users to customize how detected emotions affect audio parameters.
  * 
  * FEATURES:
- * - Emotion state configuration (nodding, smiling, surprised, neutral combinations)
+ * - Emotion state configuration (nodding, smiling, mouth open, neutral combinations)
  * - EQ preset mapping for each emotion state
  * - Volume multiplier mapping for each emotion state
  * - Rhythmic enhancement mapping for each emotion state
@@ -38,7 +38,10 @@ import {
     KEY_SHIFT_SEMITONE_MIN,
     KEY_SHIFT_SEMITONE_MAX
 } from '../audio_processing/audioEffects/keyShift';
-import { resolveKeyShiftSemitonesForEmotion } from './ReactionToSoundMapper';
+import {
+    resolveKeyShiftSemitonesForEmotion,
+    resolveVolumeMultiplierForEmotion
+} from './ReactionToSoundMapper';
 import {
     BPM_SHIFT_PERCENT_MIN,
     BPM_SHIFT_PERCENT_MAX
@@ -81,13 +84,15 @@ const ManualMapping = ({
     // Available emotion states
     const emotionStates = [
         { key: 'nodding+happy', label: 'Nodding + Smiling', icon: '' },
-        { key: 'nodding+surprised', label: 'Nodding + Surprised', icon: '' },
+        { key: 'nodding+mouthOpen', label: 'Nodding + Mouth open', icon: '' },
         { key: 'nodding+neutral', label: 'Nodding + Neutral', icon: '' },
         { key: 'thumbUp', label: 'Thumb up', icon: '' },
         { key: 'thumbDown', label: 'Thumb down', icon: '' },
+        { key: 'thumbUp+handsRaised', label: 'Thumb up + Hands raised', icon: '' },
+        { key: 'thumbDown+handsRaised', label: 'Thumb down + Hands raised', icon: '' },
         { key: 'handsRaised', label: 'Hands Raised', icon: '' },
         { key: 'happy', label: 'Smiling', icon: '' },
-        { key: 'surprised', label: 'Surprised', icon: '' },
+        { key: 'mouthOpen', label: 'Mouth open', icon: '' },
         { key: 'neutral', label: 'Neutral', icon: '' }
     ];
     
@@ -152,9 +157,8 @@ const ManualMapping = ({
         return 0;
     };
     
-    const getCurrentVolumeValue = () => {
-        return (volumeMappings[selectedEmotion] || 1.0) * 100;
-    };
+    const getCurrentVolumeValue = () =>
+        resolveVolumeMultiplierForEmotion(volumeMappings, selectedEmotion) * 100;
     
     const getCurrentRhythmicEnhancementValue = () => {
         return rhythmicEnhancementMappings[selectedEmotion] || 0;
@@ -429,32 +433,6 @@ const ManualMapping = ({
                                 />
                                 <span style={{ fontSize: '0.8rem', whiteSpace: 'nowrap' }}>+{BPM_SHIFT_PERCENT_MAX}%</span>
                             </div>
-                        </div>
-
-                        <div 
-                            className="mt-4 pt-3" 
-                            style={{ 
-                                borderTop: `1px solid #333`,
-                                backgroundColor: '#2a2a2a',
-                                borderRadius: '0.5rem',
-                                padding: '1rem'
-                            }}
-                        >
-                            <Text style={{ fontSize: '0.9rem', opacity: 0.8, margin: 0 }}>
-                                <strong>Tips:</strong>
-                            </Text>
-                            <ul style={{ fontSize: '0.8rem', opacity: 0.7, marginTop: '0.5rem', marginBottom: 0 }}>
-                                <li>Select an emotion from the dropdown to configure its audio parameters</li>
-                                <li>EQ bands range from -15dB to +15dB for precise frequency control</li>
-                                <li>Volume multipliers range from 70% (Quiet) to 145% (Maximum)</li>
-                                <li>Rhythmic enhancement ranges from Off (0%) to Maximum (100%)</li>
-                                <li>Reverb amounts range from Off (0%) to Maximum (100%)</li>
-                                <li>Delay amounts range from Off (0%) to Maximum (100%)</li>
-                                <li>Key shift ranges from −12 to +12 semitones (0 = original pitch)</li>
-                                <li>BPM shift ranges from {BPM_SHIFT_PERCENT_MIN}% to +{BPM_SHIFT_PERCENT_MAX}% (0 = original tempo)</li>
-                                <li>Nodding states scale EQ intensity and volume based on head movement amplitude (0-3)</li>
-                                <li>Changes apply immediately - try different emotions to test your settings!</li>
-                            </ul>
                         </div>
                     </div>
                 </div>

@@ -6,15 +6,15 @@
  * 
  * EMOTION PROCESSING:
  * - Analyzes recent emotion data (default: last 1 second = ~5 datapoints at 200ms intervals)
- * - Determines dominant emotion from smiling and jawOpen values (happy/surprised/neutral)
- * - Combines with nodding amplitude for compound states (nodding+happy, nodding+surprised, nodding+neutral)
- * - Generates EQ preset and volume multiplier recommendations
+ * - Determines dominant emotion from smiling and jawOpen values (happy / mouth open / neutral)
+ * - Combines with nodding amplitude for compound states (nodding+happy, nodding+mouthOpen, nodding+neutral)
+ * - Generates EQ preset, volume, rhythmic enhancement, and related recommendations
  * 
  * MAPPING SYSTEM:
  * - User-configurable emotion-to-audio mappings with sensible defaults
  * - Mappings are passed as props from parent component (Player.jsx)
  * - User can customize mappings via EmotionMappingSettings component
- * - Supports all emotion states: happy, surprised, neutral, nodding+happy, nodding+surprised, nodding+neutral
+ * - Supports emotion keys including happy, mouthOpen, neutral, nodding+*, thumbUp/thumbDown, thumb*+handsRaised, handsRaised
  * - Extensible architecture for future body pose and facial landmark integrations
  * 
  * DATA FLOW:
@@ -85,94 +85,128 @@ import {
 export const EQ_PRESETS = {
     'flat': [0, 0, 0, 0, 0, 0],
     'bass-boost': [8, 6, 3, 0, -2, -3],
+    /** Arms raised: lift 60Hz / 170Hz (sub + bass) and low-mid; pair with higher volume map */
+    'hands-raised': [11, 9, 4, 0, -2, -3],
     'treble-boost': [-3, -2, 0, 3, 6, 8],
     'vocal': [-4, -3, 5, 8, 7, 3],
     'warm': [3, 6, 3, 0, 0, 0],
     'bright': [0, 0, 0, 0, 6, 9],
     'muddy': [-3, -6, -3, 0, 0, 0],
-    'harsh': [0, 0, 0, -3, -6, -3]
+    'harsh': [0, 0, 0, -3, -6, -3],
+    /** Mouth open (jaw open): deep cut 310Hz–3kHz where vocal intelligibility sits */
+    'mouth-open': [0, 0, -14, -15, -15, -12]
 };
+
+/** Same 6-band EQ as default `handsRaised` — used for nodding+smiling / nodding+neutral too */
+const DEFAULT_HANDS_RAISED_EQ = [8, 6, 3, 0, -2, -3];
+
+/** Nodding + mouth open: subs flat; boosted 310Hz–3kHz for voice vs nodding+neutral */
+const NODDING_MOUTH_OPEN_EQ = [0, 0, 8, 5, 3, 0];
 
 // Default EQ mappings - centralized configuration (using 6D vectors)
 // Values match SoundConsole.jsx presets for consistency
 export const DEFAULT_EQ_MAPPINGS = {
-    'nodding+happy': [-4, -3, 5, 8, 7, 3],      // vocal
-    'nodding+surprised': [-3, -2, 0, 3, 6, 8],  // treble-boost
-    'nodding+neutral': [8, 6, 3, 0, -2, -3],    // bass-boost
+    'nodding+happy': [...DEFAULT_HANDS_RAISED_EQ],
+    'nodding+mouthOpen': [...NODDING_MOUTH_OPEN_EQ],
+    'nodding+neutral': [...DEFAULT_HANDS_RAISED_EQ],
     'thumbDown': [0, 0, 0, 0, 0, 0],
     'thumbUp': [0, 0, 0, 0, 0, 0],
-    'handsRaised': [8, 6, 3, 0, -2, -3],        // bass-boost
-    'happy': [0, 0, 0, 0, 0, 0],                // flat
-    'surprised': [0, 0, 0, 0, 0, 0],            // flat
+    'thumbUp+handsRaised': [0, 0, 0, 0, 0, 0],
+    'thumbDown+handsRaised': [0, 0, 0, 0, 0, 0],
+    'handsRaised': [...DEFAULT_HANDS_RAISED_EQ],
+    'happy': [0, 0, 0, 0, 0, 0],                // same EQ as neutral (smiling)
+    mouthOpen: [...NODDING_MOUTH_OPEN_EQ], // same defaults as nodding+mouthOpen
     'neutral': [0, 0, 0, 0, 0, 0]               // flat
 };
 
 export const DEFAULT_VOLUME_MAPPINGS = {
-    'nodding+happy': 1.0,
-    'nodding+surprised': 1.0, 
-    'nodding+neutral': 1.0,
+    'nodding+happy': 1.2,
+    'nodding+mouthOpen': 1.2,
+    'nodding+neutral': 1.2,
     'thumbDown': 1.0,
     'thumbUp': 1.0,
-    'handsRaised': 1.2,
-    'happy': 1.0,
-    'surprised': 1.0,
+    'thumbUp+handsRaised': 1.0,
+    'thumbDown+handsRaised': 1.0,
+    'handsRaised': 1.45, // 145% — max volume multiplier in mapping UI (full)
+    'happy': 1.0, // same as neutral
+    mouthOpen: 1.2,
     'neutral': 1.0
+};
+
+/**
+ * Volume multiplier for an emotion: use stored value when valid; otherwise install default.
+ */
+export const resolveVolumeMultiplierForEmotion = (volumeMappings, emotionState) => {
+    const raw = volumeMappings?.[emotionState];
+    if (raw !== undefined && raw !== null) {
+        const n = typeof raw === 'number' ? raw : parseFloat(raw);
+        if (Number.isFinite(n)) return n;
+    }
+    return DEFAULT_VOLUME_MAPPINGS[emotionState] ?? 1.0;
 };
 
 // Compression removed
 
 export const DEFAULT_RHYTHMIC_ENHANCEMENT_MAPPINGS = {
     'nodding+happy': 0,
-    'nodding+surprised': 0, 
+    'nodding+mouthOpen': 100,
     'nodding+neutral': 0,
     'thumbDown': 0,
     'thumbUp': 0,
+    'thumbUp+handsRaised': 0,
+    'thumbDown+handsRaised': 0,
     'handsRaised': 0,
-    'happy': 100,
-    'surprised': 0,
+    'happy': 0,
+    mouthOpen: 100,
     'neutral': 0
 };
 
 export const DEFAULT_REVERB_MAPPINGS = {
     'nodding+happy': 0,
-    'nodding+surprised': 0, 
+    'nodding+mouthOpen': 0,
     'nodding+neutral': 0,
     'thumbDown': 0,
     'thumbUp': 0,
+    'thumbUp+handsRaised': 0,
+    'thumbDown+handsRaised': 0,
     'handsRaised': 0,
     'happy': 0,
-    'surprised': 50,
+    mouthOpen: 0,
     'neutral': 0
 };
 
 export const DEFAULT_DELAY_MAPPINGS = {
     'nodding+happy': 0,
-    'nodding+surprised': 0, 
+    'nodding+mouthOpen': 0,
     'nodding+neutral': 0,
     'thumbDown': 0,
     'thumbUp': 0,
+    'thumbUp+handsRaised': 0,
+    'thumbDown+handsRaised': 0,
     'handsRaised': 0,
     'happy': 0,
-    'surprised': 40,
+    mouthOpen: 0,
     'neutral': 0
 };
 
 /** Per-emotion key shift in semitones (−12 … +12); 0 = no change */
 export const DEFAULT_KEY_SHIFT_MAPPINGS = {
     'nodding+happy': 0,
-    'nodding+surprised': 0,
+    'nodding+mouthOpen': 0,
     'nodding+neutral': 0,
     'thumbDown': -2,
     'thumbUp': 2,
+    'thumbUp+handsRaised': 2,
+    'thumbDown+handsRaised': -2,
     'handsRaised': 0,
     'happy': 0,
-    'surprised': 0,
+    mouthOpen: 0,
     'neutral': 0
 };
 
 /**
  * Key shift for an emotion: explicit `keyShiftMappings[emotion]` wins; if missing, use install default
- * (so thumb up/down keep −2 / +2 even when parent state was partial or from an older schema).
+ * (so thumb up/down keep −2 / +2 when that key is missing from `keyShiftMappings`).
  */
 export const resolveKeyShiftSemitonesForEmotion = (keyShiftMappings, emotionState) => {
     const v = keyShiftMappings?.[emotionState];
@@ -183,15 +217,20 @@ export const resolveKeyShiftSemitonesForEmotion = (keyShiftMappings, emotionStat
 /** Per-emotion BPM shift in percent (−50 … +50); 0 = no change */
 export const DEFAULT_BPM_SHIFT_MAPPINGS = {
     'nodding+happy': 0,
-    'nodding+surprised': 0,
+    'nodding+mouthOpen': 0,
     'nodding+neutral': 0,
     'thumbDown': 0,
     'thumbUp': 0,
+    'thumbUp+handsRaised': 0,
+    'thumbDown+handsRaised': 0,
     'handsRaised': 0,
     'happy': 0,
-    'surprised': 0,
+    mouthOpen: 0,
     'neutral': 0
 };
+
+/** Dominant emotion key when jaw-open signal wins over smiling / neutral. */
+export const EMOTION_KEY_MOUTH_OPEN = 'mouthOpen';
 
 
 const ReactionToSoundMapper = ({
@@ -285,11 +324,12 @@ const ReactionToSoundMapper = ({
         
         // Determine if we should switch to a new emotion (higher thresholds)
         const shouldSwitchToHappy = avgSmiling > THRESHOLD_SMILING;
-        const shouldSwitchToSurprised = avgJawOpen > THRESHOLD_JAW_OPEN;
+        const shouldSwitchToMouthOpen = avgJawOpen > THRESHOLD_JAW_OPEN;
         
         // Determine if we should switch away from current emotion (lower thresholds)
         const shouldSwitchAwayFromHappy = currentEmotion === 'happy' && avgSmiling < THRESHOLD_SMILING_LOW;
-        const shouldSwitchAwayFromSurprised = currentEmotion === 'surprised' && avgJawOpen < THRESHOLD_JAW_OPEN_LOW;
+        const shouldSwitchAwayFromMouthOpen =
+            currentEmotion === EMOTION_KEY_MOUTH_OPEN && avgJawOpen < THRESHOLD_JAW_OPEN_LOW;
         
         // Determine emotion state using hysteresis
         
@@ -298,12 +338,12 @@ const ReactionToSoundMapper = ({
         
         if (shouldSwitchToHappy && !shouldSwitchAwayFromHappy) {
             dominantEmotion = 'happy';
-        } else if (shouldSwitchToSurprised && !shouldSwitchAwayFromSurprised) {
-            dominantEmotion = 'surprised';
+        } else if (shouldSwitchToMouthOpen && !shouldSwitchAwayFromMouthOpen) {
+            dominantEmotion = EMOTION_KEY_MOUTH_OPEN;
         } else if (currentEmotion === 'happy' && !shouldSwitchAwayFromHappy) {
             dominantEmotion = 'happy'; // Keep current emotion
-        } else if (currentEmotion === 'surprised' && !shouldSwitchAwayFromSurprised) {
-            dominantEmotion = 'surprised'; // Keep current emotion
+        } else if (currentEmotion === EMOTION_KEY_MOUTH_OPEN && !shouldSwitchAwayFromMouthOpen) {
+            dominantEmotion = EMOTION_KEY_MOUTH_OPEN; // Keep current emotion
         }
         
         // Return determined emotion
@@ -331,11 +371,18 @@ const ReactionToSoundMapper = ({
      * Combine emotion with nodding state and hand raising to create compound emotion state
      */
     const determineEmotionState = useCallback((dominantEmotion) => {
-        // Hand raising takes priority as standalone state
+        // Thumb + hands raised compounds (down wins over up); defaults match thumbDown / thumbUp
+        if (areHandsRaised() && thumbDownActive) {
+            return 'thumbDown+handsRaised';
+        }
+        if (areHandsRaised() && thumbUpActive) {
+            return 'thumbUp+handsRaised';
+        }
+        // Hands raised alone
         if (areHandsRaised()) {
             return 'handsRaised';
         }
-        // Thumb gestures (down wins over up); use thumb* mapping keys (e.g. default key shift)
+        // Thumb gestures without raised hands (down wins over up)
         if (thumbDownActive) {
             return 'thumbDown';
         }
@@ -373,7 +420,7 @@ const ReactionToSoundMapper = ({
         // Step 3: Look up mappings for this emotion state
         const eqMapping = eqMappings[emotionState];
         const eqVector = getEQVector(eqMapping);
-        const volumeMultiplier = volumeMappings[emotionState];
+        const volumeMultiplier = resolveVolumeMultiplierForEmotion(volumeMappings, emotionState);
         const rhythmicEnhancement = rhythmicEnhancementMappings[emotionState];
         const reverbAmount = reverbMappings[emotionState];
         const delayAmount = delayMappings[emotionState];

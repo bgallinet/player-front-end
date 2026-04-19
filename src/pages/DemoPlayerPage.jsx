@@ -1,15 +1,23 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Image, Button } from 'react-bootstrap';
 import Player from '../components/player/Player';
-import TrackChoice from '../library_panels/TrackChoice';
+import TrackChoice, { buildDemoAudioUrl } from '../library_panels/TrackChoice';
 import EvaluationForm from '../components/EvaluationForm';
 import LargeTutorialButton from '../components/buttons/LargeTutorialButton';
 import SignUpButton from '../components/buttons/SignUpButton';
 import { useAuth } from '../contexts/AuthContext';
 import { useTutorial } from '../contexts/TutorialContext';
-import magicPlayerImage from '../images/magicplayer.png';
+import magicPlayerImage from '../images/logo_small.png';
 
-const CLOUDFRONT_URL = 'https://dhuj2x4ippvty.cloudfront.net';
+/** crossOrigin must be set before src so the first byte request uses CORS (required for Web Audio). */
+function loadAudioElementSource(audioEl, url, options = {}) {
+    if (!audioEl || !url) return;
+    const anonymousCors = options.anonymousCors === true;
+    audioEl.pause();
+    audioEl.crossOrigin = anonymousCors ? 'anonymous' : null;
+    audioEl.src = url;
+    audioEl.load();
+}
 
 const DemoPlayerPage = () => {
     const [selectedFile, setSelectedFile] = useState(null);
@@ -22,7 +30,7 @@ const DemoPlayerPage = () => {
     const { isTutorialMode, toggleTutorialMode } = useTutorial();
     
     // Duration in seconds before showing the evaluation form after play starts
-    const EVALUATION_FORM_DELAY_SECONDS = 120;
+    const EVALUATION_FORM_DELAY_SECONDS = 20 * 60;
 
     // Enable tutorial mode when user arrives on the page
     useEffect(() => {
@@ -52,7 +60,7 @@ const DemoPlayerPage = () => {
     useEffect(() => {
         const initialTrack = {
             name: 'Get Lucky - Daft Punk',
-            url: `${CLOUDFRONT_URL}/Get lucky.m4a`,
+            url: buildDemoAudioUrl('Get lucky.m4a'),
             isDemo: true
         };
         setSelectedFile(initialTrack);
@@ -61,9 +69,7 @@ const DemoPlayerPage = () => {
         // Load the initial track into audio element with a small delay to ensure it's mounted
         const timer = setTimeout(() => {
             if (audioRef.current) {
-                audioRef.current.src = initialTrack.url;
-                audioRef.current.crossOrigin = 'anonymous';
-                audioRef.current.load();
+                loadAudioElementSource(audioRef.current, initialTrack.url, { anonymousCors: true });
             }
         }, 100);
         
@@ -109,9 +115,7 @@ const DemoPlayerPage = () => {
             
             // Load the demo track into audio element
             if (audioRef.current) {
-                audioRef.current.src = file.url;
-                audioRef.current.crossOrigin = 'anonymous';
-                audioRef.current.load();
+                loadAudioElementSource(audioRef.current, file.url, { anonymousCors: true });
             }
         } else {
             // Custom file uploaded
@@ -120,8 +124,7 @@ const DemoPlayerPage = () => {
             setCurrentTrackName(file.name);
             
             if (audioRef.current) {
-                audioRef.current.src = audioUrl;
-                audioRef.current.load();
+                loadAudioElementSource(audioRef.current, audioUrl, { anonymousCors: false });
             }
         }
     };
@@ -147,7 +150,7 @@ const DemoPlayerPage = () => {
                 <div className="text-center mb-4">
                     <Image
                         src={magicPlayerImage}
-                        alt="Magic Player"
+                        alt="Player logo"
                         fluid
                         style={{ maxWidth: '100%' }}
                     />

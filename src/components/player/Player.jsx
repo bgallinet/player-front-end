@@ -10,7 +10,7 @@ import AudioDeviceSelector from './AudioDeviceSelector';
 import ManualMapping from './ManualMapping';
 import ReactionToSoundMapper, { 
     DEFAULT_EQ_MAPPINGS, 
-    DEFAULT_VOLUME_MAPPINGS, 
+    DEFAULT_VOLUME_MAPPINGS,
     DEFAULT_RHYTHMIC_ENHANCEMENT_MAPPINGS,
     DEFAULT_REVERB_MAPPINGS,
     DEFAULT_DELAY_MAPPINGS,
@@ -24,6 +24,7 @@ import AudioDeviceButton from '../buttons/AudioDeviceButton';
 import SettingsButton from '../buttons/SettingsButton';
 import TutorialButton from '../buttons/TutorialButton';
 import { trackPageView } from '../../hooks/pageViewTracker';
+import logoSmall from '../../images/logo_small.png';
 
 function resolveDeckArtworkUrl(source) {
     if (!source?.artwork_url || typeof source.artwork_url !== 'string') {
@@ -82,8 +83,8 @@ const Player = ({
     deckATrackStatusMessage,
     deckATrackStatusLoading = false,
 
-    /** When true, pressing Play on deck A bumps a counter so Face landmark UI can start if idle */
-    autoStartLandmarkWithMusic = false
+    /** When true, pressing Play bumps a counter so Face landmark / detection can start if idle */
+    autoStartLandmarkWithMusic = true
 }) => {
     // Audio state
     const [isPlaying, setIsPlaying] = useState(false);
@@ -135,6 +136,8 @@ const Player = ({
     const [playerTutorialDismissed, setPlayerTutorialDismissed] = useState(false);
     const [landmarkAutoStartTick, setLandmarkAutoStartTick] = useState(0);
     const [detectionForceStopTick, setDetectionForceStopTick] = useState(0);
+    const [deckASoundConsoleOpen, setDeckASoundConsoleOpen] = useState(false);
+    const [deckBSoundConsoleOpen, setDeckBSoundConsoleOpen] = useState(false);
 
     const internalAudioRef = useRef(null);
     const audioRef = externalAudioRef || internalAudioRef;
@@ -479,7 +482,17 @@ const Player = ({
             }
             
         } catch (error) {
-            setError(`Failed to play audio: ${error.message}`);
+            const me = audioRef.current?.error;
+            const code = me?.code;
+            const MEDIA_ERR_SRC_NOT_SUPPORTED = 4;
+            const msg = error?.message || String(error);
+            const notSuitable =
+                code === MEDIA_ERR_SRC_NOT_SUPPORTED ||
+                /not suitable/i.test(msg);
+            const corsHint = notSuitable
+                ? ' Often caused by 403/404, wrong Content-Type, or missing CORS on the CDN (GET responses need Access-Control-Allow-Origin for Web Audio with crossOrigin).'
+                : '';
+            setError(`Failed to play audio: ${msg}.${corsHint}`);
         }
     };
 
@@ -613,6 +626,9 @@ const Player = ({
             } else {
                 await deckBAudioRef.current.play();
                 setIsPlayingDeckB(true);
+                if (autoStartLandmarkWithMusic) {
+                    setLandmarkAutoStartTick((t) => t + 1);
+                }
             }
         } catch (playbackError) {
             setError(`Second track playback failed: ${playbackError.message}`);
@@ -682,13 +698,17 @@ const Player = ({
 
             if (deckBAudioRef.current) {
                 // Local fallback loading when no external Deck B loader is provided.
+                const deckB = deckBAudioRef.current;
+                deckB.pause();
                 if (track.file) {
                     const audioUrl = URL.createObjectURL(track.file);
-                    deckBAudioRef.current.src = audioUrl;
-                    deckBAudioRef.current.load();
+                    deckB.crossOrigin = null;
+                    deckB.src = audioUrl;
+                    deckB.load();
                 } else if (track.url) {
-                    deckBAudioRef.current.src = track.url;
-                    deckBAudioRef.current.load();
+                    deckB.crossOrigin = 'anonymous';
+                    deckB.src = track.url;
+                    deckB.load();
                 } else {
                     setError('Second track could not be loaded');
                 }
@@ -736,8 +756,8 @@ const Player = ({
         resolveDeckArtworkUrl(loadedDeckATrack) ||
         resolveDeckArtworkUrl(selectedFile) ||
         fallbackDeckArtworkSrc ||
-        null;
-    const deck2ArtworkUrl = resolveDeckArtworkUrl(loadedDeckBTrack) || null;
+        logoSmall;
+    const deck2ArtworkUrl = resolveDeckArtworkUrl(loadedDeckBTrack) || logoSmall;
     const deck1ArtworkSizePx = secondDeckActive ? 96 : 120;
     const deck2ArtworkSizePx = 96;
 
@@ -759,33 +779,35 @@ const Player = ({
             <div className="bg-dark rounded p-4" style={{ backgroundColor: '#1a1a1a' }}>
                 {/* Playback controls, detection, and sound console — above library / track UI */}
                 <div className="d-flex flex-column mb-4" style={{ width: '100%', overflow: 'visible' }}>
-                    <div className="d-flex justify-content-end mb-2 flex-wrap gap-2">
-                        {!secondDeckActive && (
-                            <Button
-                                variant="outline-light"
-                                size="sm"
-                                type="button"
-                                onClick={() => setSecondDeckActive(true)}
-                                style={{ fontSize: '0.8rem', borderColor: secondaryColor }}
-                            >
-                                Second track
-                            </Button>
-                        )}
-                        {secondDeckActive && (
-                            <Button
-                                variant="outline-secondary"
-                                size="sm"
-                                type="button"
-                                onClick={() => {
-                                    setSecondDeckActive(false);
-                                    handleStopDeckB();
-                                }}
-                                style={{ fontSize: '0.8rem' }}
-                            >
-                                Remove second track
-                            </Button>
-                        )}
-                    </div>
+                    {!isDemoTrack && (
+                        <div className="d-flex justify-content-end mb-2 flex-wrap gap-2">
+                            {!secondDeckActive && (
+                                <Button
+                                    variant="outline-light"
+                                    size="sm"
+                                    type="button"
+                                    onClick={() => setSecondDeckActive(true)}
+                                    style={{ fontSize: '0.8rem', borderColor: secondaryColor }}
+                                >
+                                    Second track
+                                </Button>
+                            )}
+                            {secondDeckActive && (
+                                <Button
+                                    variant="outline-secondary"
+                                    size="sm"
+                                    type="button"
+                                    onClick={() => {
+                                        setSecondDeckActive(false);
+                                        handleStopDeckB();
+                                    }}
+                                    style={{ fontSize: '0.8rem' }}
+                                >
+                                    Remove second track
+                                </Button>
+                            )}
+                        </div>
+                    )}
 
                     <div className="row g-3">
                         <div className={secondDeckActive ? 'col-12 col-lg-6' : 'col-12'}>
@@ -801,6 +823,9 @@ const Player = ({
                                 reverbMappings={reverbMappings}
                                 noddingAmplitude={noddingAmplitude}
                                 consoleZIndex={1045}
+                                onOpenMappings={() => setShowEmotionMappings(true)}
+                                soundConsoleOpen={deckASoundConsoleOpen}
+                                onSoundConsoleOpenChange={setDeckASoundConsoleOpen}
                             >
                                 <DeckControls
                                     deckId="A"
@@ -820,13 +845,13 @@ const Player = ({
                                     iconSize={secondDeckActive ? '1.68rem' : '2.1rem'}
                                     showPreviousNext={playlist.length > 0}
                                     showAudioDevice={!secondDeckActive}
-                                    showEmotionMapping={!secondDeckActive}
+                                    showSoundConsole={!secondDeckActive}
                                     showTutorial={!secondDeckActive}
                                     onAudioDeviceClick={
                                         secondDeckActive ? undefined : () => setShowAudioModal(true)
                                     }
-                                    onEmotionMappingClick={
-                                        secondDeckActive ? undefined : () => setShowEmotionMappings(true)
+                                    onSoundConsoleClick={
+                                        secondDeckActive ? undefined : () => setDeckASoundConsoleOpen(true)
                                     }
                                     tutorialDismissed={playerTutorialDismissed}
                                     setTutorialDismissed={setPlayerTutorialDismissed}
@@ -851,6 +876,9 @@ const Player = ({
                                     reverbMappings={reverbMappings}
                                     noddingAmplitude={noddingAmplitude}
                                     consoleZIndex={1055}
+                                    onOpenMappings={() => setShowEmotionMappings(true)}
+                                    soundConsoleOpen={deckBSoundConsoleOpen}
+                                    onSoundConsoleOpenChange={setDeckBSoundConsoleOpen}
                                 >
                                     <DeckControls
                                         deckId="B"
@@ -877,7 +905,7 @@ const Player = ({
 
                     {secondDeckActive && (
                         <div
-                            className="d-flex justify-content-center align-items-center gap-3 mt-3 mb-1 flex-nowrap"
+                            className="deck-controls-actions--solo d-flex justify-content-center align-items-center gap-3 mt-3 mb-1 flex-nowrap"
                             style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}
                         >
                             <AudioDeviceButton
@@ -888,10 +916,10 @@ const Player = ({
                             />
                             <SettingsButton
                                 showSettings={false}
-                                onToggleSettings={() => setShowEmotionMappings(true)}
+                                onToggleSettings={() => setDeckASoundConsoleOpen(true)}
                                 size="1.82rem"
                                 showTooltip={true}
-                                tooltipText="Emotion-to-Audio Mappings"
+                                tooltipText="Sound console"
                             />
                             <TutorialButton
                                 tutorialDismissed={playerTutorialDismissed}
