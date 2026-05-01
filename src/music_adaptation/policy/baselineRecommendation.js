@@ -65,10 +65,12 @@ export function buildBaselineRecommendation(args) {
     const keyShiftSemitones = resolveKeyShiftForPlaybackProfile(keyShiftMappings, playbackProfile);
     const mappedBpmShift =
         bpmShiftMappings[playbackProfile] ?? DEFAULT_BPM_SHIFT_MAPPINGS[playbackProfile] ?? 0;
-    const bpmShiftPercent =
+    const bpmShiftPercentRaw =
         typeof nodBpmShiftPercentOverride === 'number' && Number.isFinite(nodBpmShiftPercentOverride)
             ? nodBpmShiftPercentOverride
             : mappedBpmShift;
+    // Product rule: head nodding must not alter song tempo.
+    const bpmShiftPercent = isNodding ? 0 : bpmShiftPercentRaw;
 
     const eqPresetKeyword = Array.isArray(eqMapping)
         ? Object.keys(EQ_PRESETS).find((key) => JSON.stringify(EQ_PRESETS[key]) === JSON.stringify(eqVector)) ||
