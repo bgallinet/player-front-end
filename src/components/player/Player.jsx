@@ -1,30 +1,24 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Container, Alert, Button } from 'react-bootstrap';
-import { Text } from '../../utils/StyledComponents';
+import { Text } from '../../styles/StyledComponents';
 import { secondaryColor } from '../../utils/DisplaySettings';
-import UnifiedSensingUserUI from '../sensing/UnifiedSensingUserUI';
 import TutorialMessage from '../TutorialMessage';
 import Deck from './Deck';
 import DeckControls from './DeckControls';
 import AudioDeviceSelector from './AudioDeviceSelector';
 import ManualMapping from './ManualMapping';
-import ReactionToSoundMapper, { 
-    DEFAULT_EQ_MAPPINGS, 
-    DEFAULT_VOLUME_MAPPINGS,
-    DEFAULT_RHYTHMIC_ENHANCEMENT_MAPPINGS,
-    DEFAULT_REVERB_MAPPINGS,
-    DEFAULT_DELAY_MAPPINGS,
-    DEFAULT_KEY_SHIFT_MAPPINGS,
-    DEFAULT_BPM_SHIFT_MAPPINGS,
-    EQ_PRESETS
-} from './ReactionToSoundMapper';
+import AdaptationOrchestrator, {
+    createBuiltinStaticReactionPolicyInstance,
+    EQ_PRESETS,
+} from './AdaptationOrchestrator';
 import { useTutorial } from '../../contexts/TutorialContext';
 import { getDemoUsername, isDemoSession } from '../../hooks/demoUserManager';
-import AudioDeviceButton from '../buttons/AudioDeviceButton';
-import SettingsButton from '../buttons/SettingsButton';
-import TutorialButton from '../buttons/TutorialButton';
+import AudioDeviceButton from '../../buttons/AudioDeviceButton';
+import SettingsButton from '../../buttons/SettingsButton';
+import TutorialButton from '../../buttons/TutorialButton';
 import { trackPageView } from '../../hooks/pageViewTracker';
 import logoSmall from '../../images/logo_small.png';
+import { useAudioGraphCompiler } from '../../hooks/useAudioGraphCompiler';
 
 function resolveDeckArtworkUrl(source) {
     if (!source?.artwork_url || typeof source.artwork_url !== 'string') {
@@ -100,22 +94,21 @@ const Player = ({
     const [volumeDeckB, setVolumeDeckB] = useState(0.5);
     const [baseVolumeDeckB, setBaseVolumeDeckB] = useState(0.5);
     const [stream, setStream] = useState(null);
-    const [noddingAmplitude, setNoddingAmplitude] = useState(0);
-    const [handsRaised, setHandsRaised] = useState(false);
-    const [thumbUpActive, setThumbUpActive] = useState(false);
-    const [thumbDownActive, setThumbDownActive] = useState(false);
-    
-    // Emotion data array for ReactionToSoundMapper
-    const [emotionDataArray, setEmotionDataArray] = useState([]);
-    
-    // Emotion mappings - use defaults from ReactionToSoundMapper
-    const [eqMappings, setEqMappings] = useState(DEFAULT_EQ_MAPPINGS);
-    const [volumeMappings, setVolumeMappings] = useState(DEFAULT_VOLUME_MAPPINGS);
-    const [rhythmicEnhancementMappings, setRhythmicEnhancementMappings] = useState(DEFAULT_RHYTHMIC_ENHANCEMENT_MAPPINGS);
-    const [reverbMappings, setReverbMappings] = useState(DEFAULT_REVERB_MAPPINGS);
-    const [delayMappings, setDelayMappings] = useState(DEFAULT_DELAY_MAPPINGS);
-    const [keyShiftMappings, setKeyShiftMappings] = useState(DEFAULT_KEY_SHIFT_MAPPINGS);
-    const [bpmShiftMappings, setBpmShiftMappings] = useState(DEFAULT_BPM_SHIFT_MAPPINGS);
+
+    const [reactionPolicyInstance, setReactionPolicyInstance] = useState(() =>
+        createBuiltinStaticReactionPolicyInstance(),
+    );
+
+    const {
+        eqMappings,
+        volumeMappings,
+        rhythmicEnhancementMappings,
+        reverbMappings,
+        delayMappings,
+        keyShiftMappings,
+        bpmShiftMappings,
+    } = reactionPolicyInstance;
+
     const [currentRecommendation, setCurrentRecommendation] = useState(null);
     
     // UI state
@@ -144,6 +137,10 @@ const Player = ({
     const internalDeckBAudioRef = useRef(null);
     const deckBAudioRef = externalDeckBAudioRef || internalDeckBAudioRef;
 
+    const reactionPolicyBundleRef = useRef({});
+    reactionPolicyBundleRef.current = reactionPolicyInstance;
+
+    const applyRecommendationToConsole = useAudioGraphCompiler(audioRef);
     // Track page view on component mount (guard against StrictMode double-invocation)
     const hasTrackedPageView = useRef(false);
     useEffect(() => {
@@ -163,7 +160,7 @@ const Player = ({
 
     // Debug mapping changes - only log when they actually change
     useEffect(() => {
-    }, [eqMappings, volumeMappings, reverbMappings]);
+    }, [reactionPolicyInstance]);
 
     // Check if we have a valid audio source
     const hasValidAudioSource = useCallback(() => {
@@ -202,83 +199,83 @@ const Player = ({
         // Convert keyword to vector
         const eqVector = EQ_PRESETS[presetName] || EQ_PRESETS.flat;
         
-        setEqMappings(prev => {
-            const newMappings = {
-                ...prev,
-                [emotionState]: eqVector
-            };
-            return newMappings;
-        });
+        setReactionPolicyInstance((prev) => ({
+            ...prev,
+            eqMappings: {
+                ...prev.eqMappings,
+                [emotionState]: eqVector,
+            },
+        }));
     };
     
     // Handle volume mapping change
     const handleVolumeMappingChange = (emotionState, volumeMultiplier) => {
-        setVolumeMappings(prev => {
-            const newMappings = {
-                ...prev,
-                [emotionState]: parseFloat(volumeMultiplier)
-            };
-            return newMappings;
-        });
+        setReactionPolicyInstance((prev) => ({
+            ...prev,
+            volumeMappings: {
+                ...prev.volumeMappings,
+                [emotionState]: parseFloat(volumeMultiplier),
+            },
+        }));
     };
     
     
     // Handle rhythmic enhancement mapping change
     const handleRhythmicEnhancementMappingChange = (emotionState, rhythmicEnhancement) => {
-        setRhythmicEnhancementMappings(prev => {
-            const newMappings = {
-                ...prev,
-                [emotionState]: parseFloat(rhythmicEnhancement)
-            };
-            return newMappings;
-        });
+        setReactionPolicyInstance((prev) => ({
+            ...prev,
+            rhythmicEnhancementMappings: {
+                ...prev.rhythmicEnhancementMappings,
+                [emotionState]: parseFloat(rhythmicEnhancement),
+            },
+        }));
     };
 
     // Handle reverb mapping change
     const handleReverbMappingChange = (emotionState, reverbAmount) => {
-        setReverbMappings(prev => {
-            const newMappings = {
-                ...prev,
-                [emotionState]: parseFloat(reverbAmount)
-            };
-            return newMappings;
-        });
+        setReactionPolicyInstance((prev) => ({
+            ...prev,
+            reverbMappings: {
+                ...prev.reverbMappings,
+                [emotionState]: parseFloat(reverbAmount),
+            },
+        }));
     };
 
     // Handle delay mapping change
     const handleDelayMappingChange = (emotionState, delayAmount) => {
-        setDelayMappings(prev => {
-            const newMappings = {
-                ...prev,
-                [emotionState]: parseFloat(delayAmount)
-            };
-            return newMappings;
-        });
+        setReactionPolicyInstance((prev) => ({
+            ...prev,
+            delayMappings: {
+                ...prev.delayMappings,
+                [emotionState]: parseFloat(delayAmount),
+            },
+        }));
     };
 
     const handleKeyShiftMappingChange = (emotionState, semitones) => {
-        setKeyShiftMappings(prev => ({
+        setReactionPolicyInstance((prev) => ({
             ...prev,
-            [emotionState]: parseInt(semitones, 10)
+            keyShiftMappings: {
+                ...prev.keyShiftMappings,
+                [emotionState]: parseInt(semitones, 10),
+            },
         }));
     };
 
     const handleBpmShiftMappingChange = (emotionState, percent) => {
-        setBpmShiftMappings(prev => ({
+        setReactionPolicyInstance((prev) => ({
             ...prev,
-            [emotionState]: parseInt(percent, 10)
+            bpmShiftMappings: {
+                ...prev.bpmShiftMappings,
+                [emotionState]: parseInt(percent, 10),
+            },
         }));
     };
     
     // Handle reset to default mappings
     const handleResetToDefaults = () => {
-        setEqMappings(DEFAULT_EQ_MAPPINGS);
-        setVolumeMappings(DEFAULT_VOLUME_MAPPINGS);
-        setRhythmicEnhancementMappings(DEFAULT_RHYTHMIC_ENHANCEMENT_MAPPINGS);
-        setReverbMappings(DEFAULT_REVERB_MAPPINGS);
-        setDelayMappings(DEFAULT_DELAY_MAPPINGS);
-        setKeyShiftMappings(DEFAULT_KEY_SHIFT_MAPPINGS);
-        setBpmShiftMappings(DEFAULT_BPM_SHIFT_MAPPINGS);
+        setReactionPolicyInstance(createBuiltinStaticReactionPolicyInstance());
     };
 
     // Handle volume change
@@ -294,98 +291,15 @@ const Player = ({
         setBaseVolumeDeckB(volumeValue);
     }, []);
 
+    const handleReactionCompileOutput = useCallback(
+        (output) => {
+            setCurrentRecommendation(output.recommendation);
+            applyRecommendationToConsole(output);
+        },
+        [applyRecommendationToConsole],
+    );
 
-    // Collect facial landmark data from localStorage
-    useEffect(() => {
-        const collectFacialLandmarkData = () => {
-            try {
-                let storedFaceData = null;
-                let storedFaceVisible = null;
-                
-                try {
-                    storedFaceData = localStorage.getItem('face_position_data_arrays');
-                    storedFaceVisible = localStorage.getItem('face_visible');
-                } catch (storageError) {
-                    // Silent error handling
-                    return;
-                }
-                
-                if (storedFaceData && storedFaceVisible === 'true') {
-                    try {
-                        const parsedArrays = JSON.parse(storedFaceData);
-                        
-                        const latestAmplitude = parsedArrays.noddingAmplitude || 0;
-                        const latestFrequency = parsedArrays.noddingFrequency || 0;
-                        
-                        setNoddingAmplitude(latestAmplitude);
-                        
-                        const dataPoints = parsedArrays.timestamps.map((timestamp, index) => ({
-                            timestamp: timestamp,
-                            smiling: parsedArrays.smilingArray ? parsedArrays.smilingArray[index] : 0,
-                            jawOpen: parsedArrays.jawOpenArray ? parsedArrays.jawOpenArray[index] : 0,
-                            frequency: parsedArrays.frequencyArray ? parsedArrays.frequencyArray[index] : latestFrequency,
-                            amplitude: parsedArrays.amplitudeArray ? parsedArrays.amplitudeArray[index] : latestAmplitude,
-                            xPosition: parsedArrays.centerXPositions[index],
-                            yPosition: parsedArrays.centerYPositions[index],
-                            width: parsedArrays.widthPositions[index],
-                            height: parsedArrays.heightPositions[index]
-                        }));
-                        
-                        setEmotionDataArray(dataPoints);
-                        
-                    } catch (parseError) {
-                        // Silent error handling
-                    }
-                } else {
-                    setEmotionDataArray([]);
-                    setNoddingAmplitude(0);
-                }
-                
-                // Collect hand raising + thumb gesture flags from localStorage
-                try {
-                    const leftHandRaised = localStorage.getItem('left_hand_raised') === 'true';
-                    const rightHandRaised = localStorage.getItem('right_hand_raised') === 'true';
-                    setHandsRaised(leftHandRaised || rightHandRaised);
-
-                    const leftDown = localStorage.getItem('mediapipe_left_thumb_down') === 'true';
-                    const rightDown = localStorage.getItem('mediapipe_right_thumb_down') === 'true';
-                    const leftUp = localStorage.getItem('mediapipe_left_thumb_up') === 'true';
-                    const rightUp = localStorage.getItem('mediapipe_right_thumb_up') === 'true';
-                    const anyDown = leftDown || rightDown;
-                    setThumbDownActive(anyDown);
-                    setThumbUpActive(!anyDown && (leftUp || rightUp));
-                } catch (error) {
-                    setHandsRaised(false);
-                    setThumbDownActive(false);
-                    setThumbUpActive(false);
-                }
-            } catch (error) {
-                // Silent error handling
-            }
-        };
-        
-        collectFacialLandmarkData();
-        // Read more frequently to catch data before it's cleared
-        const interval = setInterval(collectFacialLandmarkData, 200);
-        
-        return () => {
-            clearInterval(interval);
-        };
-    }, []);
-    
-    // Handle recommendations from ReactionToSoundMapper - simplified approach
-    const handleRecommendationChange = useCallback((recommendation) => {
-        // Handle recommendation change
-        
-        // Store the recommendation in state so it can be passed to SoundConsole
-        setCurrentRecommendation(recommendation);
-        
-        // Also pass the recommendation to SoundConsole for processing
-        if (audioRef.current && audioRef.current.soundConsoleMethods && audioRef.current.soundConsoleMethods.applyRecommendation) {
-            audioRef.current.soundConsoleMethods.applyRecommendation(recommendation);
-        }
-    }, []);
-
+    const noddingAmplitudeForDeckUi = Number(currentRecommendation?.noddingAmplitude) || 0;
     // Set demo session mode
     useEffect(() => {
         if (isDemoTrack) {
@@ -821,7 +735,7 @@ const Player = ({
                                 recommendation={currentRecommendation}
                                 rhythmicEnhancementMappings={rhythmicEnhancementMappings}
                                 reverbMappings={reverbMappings}
-                                noddingAmplitude={noddingAmplitude}
+                                noddingAmplitude={noddingAmplitudeForDeckUi}
                                 consoleZIndex={1045}
                                 onOpenMappings={() => setShowEmotionMappings(true)}
                                 soundConsoleOpen={deckASoundConsoleOpen}
@@ -874,7 +788,7 @@ const Player = ({
                                     recommendation={null}
                                     rhythmicEnhancementMappings={rhythmicEnhancementMappings}
                                     reverbMappings={reverbMappings}
-                                    noddingAmplitude={noddingAmplitude}
+                                    noddingAmplitude={noddingAmplitudeForDeckUi}
                                     consoleZIndex={1055}
                                     onOpenMappings={() => setShowEmotionMappings(true)}
                                     soundConsoleOpen={deckBSoundConsoleOpen}
@@ -905,8 +819,8 @@ const Player = ({
 
                     {secondDeckActive && (
                         <div
-                            className="deck-controls-actions--solo d-flex justify-content-center align-items-center gap-3 mt-3 mb-1 flex-nowrap"
-                            style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}
+                            className="deck-controls-actions--solo d-flex justify-content-center align-items-center gap-3 mt-3 mb-1 flex-wrap"
+                            style={{ overflow: 'visible', rowGap: '0.35rem' }}
                         >
                             <AudioDeviceButton
                                 onClick={() => setShowAudioModal(true)}
@@ -934,17 +848,17 @@ const Player = ({
                     {/* Detection UI — face, pose, and hands in one pipeline */}
                     {stream && (
                         <div style={{ width: '100%', position: 'relative', zIndex: 1, clear: 'both', marginTop: '0.5rem', marginBottom: '1rem' }}>
-                            <UnifiedSensingUserUI
+                            <AdaptationOrchestrator
+                                policyBundleRef={reactionPolicyBundleRef}
                                 stream={stream}
-                                embeddingTW={false}
-                                is_demo_session={is_demo_session}
-                                demo_username={demo_username}
-                                sessionName={`${pageName}_session`}
-                                sizeMode="large"
-                                autoStartLandmarkTick={
-                                    autoStartLandmarkWithMusic ? landmarkAutoStartTick : 0
-                                }
+                                isDemoSession={is_demo_session}
+                                sensingSessionName={`${pageName}_session`}
+                                sensingSizeMode="large"
+                                autoStartLandmarkTick={autoStartLandmarkWithMusic ? landmarkAutoStartTick : 0}
                                 forceStopDetectionTick={detectionForceStopTick}
+                                enabled={!!stream}
+                                nodTrackBpmAudioRef={audioRef}
+                                onReactionOutput={handleReactionCompileOutput}
                             />
                         </div>
                     )}
@@ -1036,29 +950,7 @@ const Player = ({
 
             {/* Facial Landmark Detection Section */}
             <>
-                {stream ? (
-                    <>
-                        <ReactionToSoundMapper
-                            emotionDataArray={emotionDataArray}
-                            noddingAmplitude={noddingAmplitude}
-                            handsRaised={handsRaised}
-                            thumbUpActive={thumbUpActive}
-                            thumbDownActive={thumbDownActive}
-                            eqMappings={eqMappings}
-                            volumeMappings={volumeMappings}
-                            rhythmicEnhancementMappings={rhythmicEnhancementMappings}
-                            reverbMappings={reverbMappings}
-                            delayMappings={delayMappings}
-                            keyShiftMappings={keyShiftMappings}
-                            bpmShiftMappings={bpmShiftMappings}
-                            onRecommendationChange={(recommendation) => {
-                                // ReactionToSoundMapper calling onRecommendationChange
-                                handleRecommendationChange(recommendation);
-                            }}
-                        />
-                        
-                    </>
-                ) : (
+                {stream ? null : (
                     <div className="text-center py-4">
                         <Text>Please allow camera access to enable face, body, and hand sensing.</Text>
                     </div>

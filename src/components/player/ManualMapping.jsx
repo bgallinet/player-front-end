@@ -30,18 +30,22 @@
 
 import React, { useState } from 'react';
 import { Form } from 'react-bootstrap';
-import { Subtitle, Text } from '../../utils/StyledComponents';
+import { Subtitle, Text } from '../../styles/StyledComponents';
 import { secondaryColor } from '../../utils/DisplaySettings';
 import settingsIcon from '../../images/settingsicon.png';
-import CloseButton from '../buttons/CloseButton';
+import CloseButton from '../../buttons/CloseButton';
 import {
     KEY_SHIFT_SEMITONE_MIN,
     KEY_SHIFT_SEMITONE_MAX
 } from '../audio_processing/audioEffects/keyShift';
 import {
-    resolveKeyShiftSemitonesForEmotion,
-    resolveVolumeMultiplierForEmotion
-} from './ReactionToSoundMapper';
+    resolveKeyShiftForPlaybackProfile as resolveKeyShiftSemitonesForEmotion,
+    resolveVolumeMultiplierForPlaybackProfile as resolveVolumeMultiplierForEmotion,
+} from '../../music_adaptation/policy/reactionMappingDefaults.v1';
+import {
+    REACTION_PLAYBACK_PROFILE_UI_ROWS,
+    REACTION_PLAYBACK_PROFILE,
+} from '../../music_adaptation/policy/reactionPlaybackProfiles.v1';
 import {
     BPM_SHIFT_PERCENT_MIN,
     BPM_SHIFT_PERCENT_MAX
@@ -78,23 +82,13 @@ const ManualMapping = ({
     showEmotionMappings,
     onToggleEmotionMappings
 }) => {
-    // State for selected emotion
-    const [selectedEmotion, setSelectedEmotion] = useState('nodding+happy');
-    
-    // Available emotion states
-    const emotionStates = [
-        { key: 'nodding+happy', label: 'Nodding + Smiling', icon: '' },
-        { key: 'nodding+mouthOpen', label: 'Nodding + Mouth open', icon: '' },
-        { key: 'nodding+neutral', label: 'Nodding + Neutral', icon: '' },
-        { key: 'thumbUp', label: 'Thumb up', icon: '' },
-        { key: 'thumbDown', label: 'Thumb down', icon: '' },
-        { key: 'thumbUp+handsRaised', label: 'Thumb up + Hands raised', icon: '' },
-        { key: 'thumbDown+handsRaised', label: 'Thumb down + Hands raised', icon: '' },
-        { key: 'handsRaised', label: 'Hands Raised', icon: '' },
-        { key: 'happy', label: 'Smiling', icon: '' },
-        { key: 'mouthOpen', label: 'Mouth open', icon: '' },
-        { key: 'neutral', label: 'Neutral', icon: '' }
-    ];
+    const [selectedEmotion, setSelectedEmotion] = useState(REACTION_PLAYBACK_PROFILE.NODDING_HAPPY);
+
+    const emotionStates = REACTION_PLAYBACK_PROFILE_UI_ROWS.map((row) => ({
+        key: row.id,
+        label: row.label,
+        icon: '',
+    }));
     
     // EQ band labels and frequencies
     const eqBands = [

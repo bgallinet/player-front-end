@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Image, Button } from 'react-bootstrap';
 import Player from '../components/player/Player';
-import TrackChoice, { buildDemoAudioUrl } from '../library_panels/TrackChoice';
+import TrackChoice, { getDefaultDemoTrackPayload } from '../components/library_panels/TrackChoice';
 import EvaluationForm from '../components/EvaluationForm';
-import LargeTutorialButton from '../components/buttons/LargeTutorialButton';
-import SignUpButton from '../components/buttons/SignUpButton';
+import LargeTutorialButton from '../buttons/LargeTutorialButton';
+import SignUpButton from '../buttons/SignUpButton';
 import { useAuth } from '../contexts/AuthContext';
 import { useTutorial } from '../contexts/TutorialContext';
 import magicPlayerImage from '../images/logo_small.png';
@@ -56,13 +56,9 @@ const DemoPlayerPage = () => {
         "comment"   // Text input for feedback
     ];
 
-    // Initialize with Get Lucky track
+    // Initialize with default demo track (first entry in TrackChoice DEMO_TRACKS)
     useEffect(() => {
-        const initialTrack = {
-            name: 'Get Lucky - Daft Punk',
-            url: buildDemoAudioUrl('Get lucky.m4a'),
-            isDemo: true
-        };
+        const initialTrack = getDefaultDemoTrackPayload();
         setSelectedFile(initialTrack);
         setCurrentTrackName(initialTrack.name);
         

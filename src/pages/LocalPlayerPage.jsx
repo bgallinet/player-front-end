@@ -1,11 +1,11 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { Image } from 'react-bootstrap';
-import { Subtitle, StyledCard } from '../utils/StyledComponents';
-import ExpandReduceButton from '../components/buttons/ExpandReduceButton';
+import { Subtitle, StyledCard } from '../styles/StyledComponents';
+import ExpandReduceButton from '../buttons/ExpandReduceButton';
 import { secondaryColor } from '../utils/DisplaySettings';
 import Player from '../components/player/Player';
-import PlaylistCard from '../components/player/PlaylistCard';
-import MusicLibraryPanel from '../library_panels/MusicLibraryPanel';
+import PlaylistCard from '../components/library_panels/PlaylistCard';
+import MusicLibraryPanel from '../components/library_panels/MusicLibraryPanel';
 import magicPlayerImage from '../images/logo_small.png';
 
 const LocalPlayerPage = () => {

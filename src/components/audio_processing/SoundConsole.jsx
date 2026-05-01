@@ -42,8 +42,9 @@
  */
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { guess } from 'web-audio-beat-detector';
 import { Button, Form } from 'react-bootstrap';
-import { Subtitle, Text } from '../../utils/StyledComponents';
+import { Subtitle, Text } from '../../styles/StyledComponents';
 import { secondaryColor, thresholdForVisualizationOfNodding } from '../../utils/DisplaySettings';
 import maxSoundIcon from '../../images/maxsoundicon.png';
 import minSoundIcon from '../../images/minsoundicon.png';
@@ -61,6 +62,9 @@ import {
     BPM_SHIFT_PERCENT_MIN,
     BPM_SHIFT_PERCENT_MAX,
 } from './audioEffects';
+
+/** Upper bound on decoded audio used for tempo estimation (seconds). */
+const TRACK_BPM_ANALYZE_MAX_SECONDS = 45;
 
 const SoundConsole = ({
     audioRef,
@@ -92,6 +96,8 @@ const SoundConsole = ({
     const [keyShiftSemitones, setKeyShiftSemitones] = useState(0);
     const [bpmShiftPercent, setBpmShiftPercent] = useState(0);
     const [currentRecommendation, setCurrentRecommendation] = useState(null);
+    const [trackBpm, setTrackBpm] = useState(null);
+    const [trackBpmPending, setTrackBpmPending] = useState(false);
     
 
 
@@ -421,7 +427,7 @@ const SoundConsole = ({
     }, []);
     
     // Apply emotion-based volume with nodding amplitude scaling
-    const applyEmotionVolume = useCallback((emotionState, amplitude = 0) => {
+    const applyEmotionVolume = useCallback((emotionState, amplitude = 0, volumeTracksNoddingAmplitude = false) => {
         try {
             
             // Ensure audio context is initialized
@@ -471,8 +477,8 @@ const SoundConsole = ({
             
             let finalVolume = baseVolume * volumeMultiplier;
             
-            // For nodding states, scale the volume based on amplitude (0-thresholdForVisualizationOfNodding range)
-            if (emotionState.startsWith('nodding+') && validAmplitude > 0) {
+            // For nodding-linked profiles, scale volume by amplitude (0-thresholdForVisualizationOfNodding range)
+            if (volumeTracksNoddingAmplitude && validAmplitude > 0) {
                 const cappedAmplitude = Math.min(validAmplitude, thresholdForVisualizationOfNodding * 2); // Cap at 2x threshold
                 const scaleFactor = cappedAmplitude / (thresholdForVisualizationOfNodding * 2); // Scale 0-1
                 
@@ -505,7 +511,7 @@ const SoundConsole = ({
         } catch (error) {
             // Silent error handling
         }
-    }, [volumeMappings, volume, onVolumeChange]);
+    }, [volumeMappings, volume, baseVolume, onVolumeChange]);
     
 
 
@@ -642,6 +648,125 @@ const SoundConsole = ({
         }
     }, [audioRef.current, initializeAudioContext]);
 
+    const trackBpmGenRef = useRef(0);
+    const lastSuccessfulBpmUrlRef = useRef('');
+    const bpmPendingForUrlRef = useRef(null);
+
+    // Estimate track BPM when a new media URL loads (decode + web-audio-beat-detector).
+    useEffect(() => {
+        let cancelled = false;
+        let rafId = 0;
+        let el = null;
+
+        const syncDetectedTrackBpm = (value) => {
+            const node = audioRef.current;
+            if (node) node.detectedTrackBpm = value;
+        };
+
+        const runForUrl = (url) => {
+            if (!url) {
+                lastSuccessfulBpmUrlRef.current = '';
+                bpmPendingForUrlRef.current = null;
+                syncDetectedTrackBpm(null);
+                setTrackBpm(null);
+                setTrackBpmPending(false);
+                return;
+            }
+            if (url === lastSuccessfulBpmUrlRef.current) return;
+            if (bpmPendingForUrlRef.current === url) return;
+
+            const Ctor = window.AudioContext || window.webkitAudioContext;
+            if (!Ctor) {
+                syncDetectedTrackBpm(null);
+                setTrackBpm(null);
+                setTrackBpmPending(false);
+                return;
+            }
+
+            const gen = ++trackBpmGenRef.current;
+            bpmPendingForUrlRef.current = url;
+            syncDetectedTrackBpm(null);
+            setTrackBpm(null);
+            setTrackBpmPending(true);
+
+            (async () => {
+                const decodeCtx = new Ctor();
+                try {
+                    const res = await fetch(url, { mode: 'cors', credentials: 'omit', cache: 'force-cache' });
+                    if (!res.ok) throw new Error('bpm fetch');
+                    const raw = await res.arrayBuffer();
+                    const buffer = await decodeCtx.decodeAudioData(raw.slice(0));
+                    if (gen !== trackBpmGenRef.current) return;
+                    const dur = Math.min(TRACK_BPM_ANALYZE_MAX_SECONDS, buffer.duration || 0);
+                    if (dur < 1) throw new Error('buffer too short');
+                    const { bpm } = await guess(buffer, 0, dur);
+                    if (gen !== trackBpmGenRef.current) return;
+                    const rounded = Number.isFinite(bpm) ? Math.round(bpm) : null;
+                    setTrackBpm(rounded);
+                    if (rounded != null) {
+                        lastSuccessfulBpmUrlRef.current = url;
+                        syncDetectedTrackBpm(rounded);
+                    } else {
+                        syncDetectedTrackBpm(null);
+                    }
+                } catch {
+                    if (gen === trackBpmGenRef.current) {
+                        syncDetectedTrackBpm(null);
+                        setTrackBpm(null);
+                    }
+                } finally {
+                    decodeCtx.close().catch(() => {});
+                    if (gen === trackBpmGenRef.current) {
+                        bpmPendingForUrlRef.current = null;
+                        setTrackBpmPending(false);
+                    }
+                }
+            })();
+        };
+
+        const onLoadedData = () => {
+            const node = audioRef.current;
+            if (!node || cancelled) return;
+            runForUrl(node.currentSrc || node.src || '');
+        };
+
+        const onEmptied = () => {
+            lastSuccessfulBpmUrlRef.current = '';
+            bpmPendingForUrlRef.current = null;
+            trackBpmGenRef.current += 1;
+            syncDetectedTrackBpm(null);
+            setTrackBpm(null);
+            setTrackBpmPending(false);
+        };
+
+        const attach = () => {
+            if (cancelled) return;
+            const node = audioRef.current;
+            if (!node) {
+                rafId = requestAnimationFrame(attach);
+                return;
+            }
+            el = node;
+            el.addEventListener('loadeddata', onLoadedData);
+            el.addEventListener('emptied', onEmptied);
+            if (el.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+                onLoadedData();
+            }
+        };
+
+        attach();
+
+        return () => {
+            cancelled = true;
+            if (rafId) cancelAnimationFrame(rafId);
+            trackBpmGenRef.current += 1;
+            if (el) {
+                el.removeEventListener('loadeddata', onLoadedData);
+                el.removeEventListener('emptied', onEmptied);
+            }
+        };
+    }, [audioRef]);
+
 
     // Apply complete recommendation from ReactionToSoundMapper - delegate to individual components
     const applyRecommendation = useCallback((recommendation) => {
@@ -672,7 +797,11 @@ const SoundConsole = ({
         if (currentRecommendation) {
             // Apply volume based on recommendation
             if (currentRecommendation.emotionState && currentRecommendation.volumeMultiplier && currentRecommendation.volumeMultiplier !== 1.0) {
-                applyEmotionVolume(currentRecommendation.emotionState, currentRecommendation.noddingAmplitude);
+                applyEmotionVolume(
+                    currentRecommendation.emotionState,
+                    currentRecommendation.noddingAmplitude,
+                    Boolean(currentRecommendation.volumeTracksNoddingAmplitude),
+                );
             } else {
                 resetToBaseValues();
             }
@@ -804,11 +933,15 @@ const SoundConsole = ({
 
             {/* BPM / Tempo Control */}
             <div className="mt-4 mb-4">
-                <div className="d-flex align-items-center justify-content-between mb-2">
+                <div className="d-flex align-items-center justify-content-between mb-2 flex-wrap gap-2">
                     <Subtitle style={{ margin: 0 }}>BPM Shift</Subtitle>
-                    <div className="d-flex gap-2 align-items-center">
+                    <div className="d-flex flex-column align-items-end gap-0">
                         <Text style={{ margin: 0, fontSize: '0.9rem', color: secondaryColor, fontWeight: 'bold' }}>
                             {bpmShiftPercent === 0 ? 'Original' : `${bpmShiftPercent > 0 ? '+' : ''}${bpmShiftPercent}%`}
+                        </Text>
+                        <Text style={{ margin: 0, fontSize: '0.78rem', color: '#aaa' }}>
+                            Track tempo:{' '}
+                            {trackBpmPending ? 'Analyzing…' : trackBpm != null ? `${trackBpm} BPM` : '—'}
                         </Text>
                     </div>
                 </div>

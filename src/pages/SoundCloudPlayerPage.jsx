@@ -1,12 +1,12 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Button, Spinner } from 'react-bootstrap';
 import Hls from 'hls.js';
-import { Subtitle, StyledCard, Text } from '../utils/StyledComponents';
+import { Subtitle, StyledCard, Text } from '../styles/StyledComponents';
 import { secondaryColor } from '../utils/DisplaySettings';
-import ExpandReduceButton from '../components/buttons/ExpandReduceButton';
+import ExpandReduceButton from '../buttons/ExpandReduceButton';
 import Player from '../components/player/Player';
-import PlaylistCard from '../components/player/PlaylistCard';
-import SoundCloudLibraryPanel from '../library_panels/SoundCloudLibraryPanel';
+import PlaylistCard from '../components/library_panels/PlaylistCard';
+import SoundCloudLibraryPanel from '../components/library_panels/SoundCloudLibraryPanel';
 import { useSoundCloudAuth } from '../contexts/SoundCloudAuthContext';
 import { getStreamUrl } from '../utils/soundcloudService';
 

@@ -5,11 +5,11 @@ import { useTutorial } from '../contexts/TutorialContext';
 import { useNavigate } from 'react-router-dom';
 import { Container, Row, Col, Button, Image, Alert, Spinner } from 'react-bootstrap';
 import TutorialMessage from '../components/TutorialMessage';
-import LargeTutorialButton from '../components/buttons/LargeTutorialButton';
-import TypewriterText from '../utils/TypewriterText';
-import SignUpButton from '../components/buttons/SignUpButton';
-import LoginButton from '../components/buttons/LoginButton';
-import { Subtitle, Text, StyledCard } from '../utils/StyledComponents';
+import LargeTutorialButton from '../buttons/LargeTutorialButton';
+import TypewriterText from '../styles/TypewriterText';
+import SignUpButton from '../buttons/SignUpButton';
+import LoginButton from '../buttons/LoginButton';
+import { Subtitle, Text, StyledCard } from '../styles/StyledComponents';
 import { secondaryColor } from '../utils/DisplaySettings';
 import { trackPageView } from '../hooks/pageViewTracker';
 
