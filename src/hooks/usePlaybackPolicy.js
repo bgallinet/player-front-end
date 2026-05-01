@@ -58,11 +58,13 @@ export function usePlaybackPolicy({
         const processReactions = () => {
             try {
                 const output = tick();
+                // Always emit the latest compile output so adaptation remains reactive even when
+                // value deltas are subtle and diff heuristics would suppress updates.
                 if (reactionOutputsDiffer(output, lastOutputRef.current)) {
                     lastOutputRef.current = output;
-                    if (onReactionOutput && typeof onReactionOutput === 'function') {
-                        onReactionOutput(output);
-                    }
+                }
+                if (onReactionOutput && typeof onReactionOutput === 'function') {
+                    onReactionOutput(output);
                 }
             } catch {
                 /* ignore */

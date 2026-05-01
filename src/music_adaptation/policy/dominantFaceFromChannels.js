@@ -7,7 +7,7 @@ import {
     THRESHOLD_JAW_OPEN_LOW,
     THRESHOLD_SMILING,
     THRESHOLD_SMILING_LOW,
-} from '../../hooks/ReactionMapperConfig';
+} from '../ReactionMapperConfig';
 import { DOMINANT_FACE_TONE } from './reactionPlaybackProfiles.v1';
 
 /**

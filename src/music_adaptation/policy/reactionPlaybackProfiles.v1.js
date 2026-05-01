@@ -3,7 +3,7 @@
  * Nothing here concatenates cues at runtime; the compiler picks exactly one profile id via {@link deriveReactionPlaybackProfile}.
  */
 
-import { THRESHOLD_NODDING } from '../../hooks/ReactionMapperConfig';
+import { THRESHOLD_NODDING } from '../ReactionMapperConfig';
 
 /** Dominant face tone from vision channels (before nod/gesture arbitration). */
 export const DOMINANT_FACE_TONE = Object.freeze({
