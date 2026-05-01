@@ -1,13 +1,12 @@
 import './index.css';
 import { useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Navigation from './components/Navigation';
 import { AuthProvider } from './contexts/AuthContext';
 import { TutorialProvider } from './contexts/TutorialContext';
 import { SoundCloudAuthProvider } from './contexts/SoundCloudAuthContext';
 
 import Home from './pages/Home.jsx';
-import Landing from './pages/Landing.jsx';
 import Callback from './pages/Callback.jsx';
 import DemoPlayerPage from './pages/DemoPlayerPage.jsx';
 import LocalPlayerPage from './pages/LocalPlayerPage.jsx';
@@ -28,7 +27,7 @@ const App = () => {
           <Router>
             <Routes>
               <Route path="/" element={<><Navigation /><Home /></>} />
-              <Route path="/landing" element={<Landing />} />
+              <Route path="/landing" element={<Navigate to="/" replace />} />
               <Route path="/callback" element={<><Navigation /><Callback /></>} />
 
               <Route path="/demoplayer" element={<><Navigation /><DemoPlayerPage /></>} />

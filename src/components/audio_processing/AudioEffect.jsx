@@ -25,7 +25,7 @@
 
 import React, { useRef, useCallback, useEffect } from 'react';
 import { Form } from 'react-bootstrap';
-import { Subtitle, Text } from '../../utils/StyledComponents';
+import { Subtitle, Text } from '../../styles/StyledComponents';
 import { secondaryColor } from '../../utils/DisplaySettings';
 import { AUDIO_EFFECTS } from './audioEffects';
 

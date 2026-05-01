@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Button } from 'react-bootstrap';
 import { useTutorial } from '../contexts/TutorialContext';
 import tutorialIcon from '../images/tutorialicon.png';
-import TypewriterText from '../utils/TypewriterText';
+import TypewriterText from '../styles/TypewriterText';
 
 const TutorialMessage = ({ messages, position = 'top-center', onClose }) => {
     const { isTutorialMode, disableTutorialMode } = useTutorial();

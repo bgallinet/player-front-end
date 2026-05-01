@@ -30,8 +30,7 @@ const scanFrequency = scanFrequencyEmotion;
 
 const noddingAnalysisWindow = 3000; // in milliseconds
 const apiSendInterval = 2000; // in milliseconds
-const reactionMapperUpdateInterval = 500; // in milliseconds - how often ReactionToSoundMapper generates recommendations
-const landmarkDataUploadInterval = 1000; // in milliseconds - how often facial landmark data is sent to server and stored in localStorage
+const reactionMapperUpdateInterval = 500; // in milliseconds - how often AdaptationOrchestrator / playback policy generates recommendations
 
 // Thresholds for facial reactions visualization and status determination
 const thresholdForVisualizationOfNodding = 0.005;
@@ -58,6 +57,6 @@ export {
     buttonPaddingNumber, roundedCornersRadius, secMenuWidthNumber, secMenuUserWidthNumber,
     backgroundColor, secondaryBackgroundColor, apiSendInterval, thresholdForVisualizationOfNodding,
     thresholdForVisualizationOfSmiling, thresholdForVisualizationOfJawOpen,
-    noFaceFramesThreshold, reactionMapperUpdateInterval, landmarkDataUploadInterval,
+    noFaceFramesThreshold, reactionMapperUpdateInterval,
     liveCamDisplayRows, liveCamDisplayMaxUsers
 };

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from 'react-bootstrap';
-import { Text, StyledCard } from '../../utils/StyledComponents';
-import CloseButton from '../buttons/CloseButton';
+import { Text, StyledCard } from '../../styles/StyledComponents';
+import CloseButton from '../../buttons/CloseButton';
 import { secondaryColor } from '../../utils/DisplaySettings';
 import SoundConsole from '../audio_processing/SoundConsole';
 
@@ -94,7 +94,7 @@ const Deck = ({
 
     return (
         <>
-            <StyledCard className="mb-0" style={{ position: 'relative', zIndex: 0 }}>
+            <StyledCard className="mb-0" style={{ position: 'relative', zIndex: 0, overflow: 'visible' }}>
                 <div className="d-flex align-items-center justify-content-end mb-2 flex-wrap gap-2">
                     <Button
                         variant="outline-light"

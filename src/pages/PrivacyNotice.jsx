@@ -1,6 +1,6 @@
 import React from 'react';
 import { Container, Row, Col } from 'react-bootstrap';
-import { StyledCard } from '../utils/StyledComponents';
+import { StyledCard } from '../styles/StyledComponents';
 import PrivacyNoticeAnnex from '../components/PrivacyNoticeAnnex';
 
 const PrivacyNotice = () => {

@@ -1,16 +1,16 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Spinner } from 'react-bootstrap';
-import { Text } from '../../utils/StyledComponents';
+import { Text } from '../../styles/StyledComponents';
 import { secondaryColor } from '../../utils/DisplaySettings';
 import { usePointerSlide1D } from '../../hooks/usePointerSlide1D';
 import defaultDeckArtwork from '../../images/logo_small.png';
-import AudioDeviceButton from '../buttons/AudioDeviceButton';
-import SettingsButton from '../buttons/SettingsButton';
-import TutorialButton from '../buttons/TutorialButton';
-import StopButton from '../buttons/StopButton';
-import PlayPauseButton from '../buttons/PlayPauseButton';
-import PreviousButton from '../buttons/PreviousButton';
-import NextButton from '../buttons/NextButton';
+import AudioDeviceButton from '../../buttons/AudioDeviceButton';
+import SettingsButton from '../../buttons/SettingsButton';
+import TutorialButton from '../../buttons/TutorialButton';
+import StopButton from '../../buttons/StopButton';
+import PlayPauseButton from '../../buttons/PlayPauseButton';
+import PreviousButton from '../../buttons/PreviousButton';
+import NextButton from '../../buttons/NextButton';
 
 const noop = () => {};
 const falseFn = () => false;
@@ -186,10 +186,18 @@ export const DeckControls = ({
                 </Text>
             ) : null}
 
-            <div className="deck-controls-actions">
+            <div
+                className="deck-controls-actions"
+                style={{
+                    overflow: 'visible',
+                    padding: '6px 10px 4px',
+                    marginLeft: '-4px',
+                    marginRight: '-4px',
+                }}
+            >
                 <div
-                    className="deck-controls-transport d-flex justify-content-center align-items-center gap-3 flex-nowrap"
-                    style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}
+                    className="deck-controls-transport d-flex justify-content-center align-items-center gap-3 flex-wrap"
+                    style={{ overflow: 'visible', rowGap: '0.35rem' }}
                 >
                     {showPreviousNext && (
                         <PreviousButton
@@ -227,8 +235,8 @@ export const DeckControls = ({
 
                 {showUtilityRow && (
                     <div
-                        className="deck-controls-utilities d-flex justify-content-center align-items-center gap-3 flex-nowrap"
-                        style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}
+                        className="deck-controls-utilities d-flex justify-content-center align-items-center gap-3 flex-wrap mt-2"
+                        style={{ overflow: 'visible', rowGap: '0.35rem' }}
                     >
                         {showAudioDevice && onAudioDeviceClick && (
                             <AudioDeviceButton
