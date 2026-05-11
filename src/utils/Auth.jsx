@@ -75,8 +75,10 @@ function persistTokens(data) {
 }
 
 /**
- * OAuth2 authorization_code exchange. Dev uses public client (no secret). Prod/test need
- * REACT_APP_COGNITO_CLIENT_SECRET at build time (see EnvironmentVariables.CognitoClientSecret).
+ * OAuth2 authorization_code exchange.
+ * - Dev: no PKCE, no client_secret (public client).
+ * - Prod/test: PKCE + client_secret from Amplify (REACT_APP_COGNITO_CLIENT_SECRET_* or fallback
+ *   REACT_APP_COGNITO_CLIENT_SECRET on EnvironmentVariables).
  */
 export async function fetchTokens(code) {
     if (!code) {
@@ -115,21 +117,21 @@ export async function fetchTokens(code) {
             throw new Error('Code verifier not found. Please sign in again.');
         }
 
-        const clientSecret = (EnvironmentVariables.CognitoClientSecret || '').trim();
-        if (!clientSecret) {
-            throw new Error(
-                'Missing Cognito client secret: set REACT_APP_COGNITO_CLIENT_SECRET for prod/test builds.'
-            );
-        }
-
         const params = new URLSearchParams({
             grant_type: 'authorization_code',
             client_id: EnvironmentVariables.ClientID,
             code,
             redirect_uri: EnvironmentVariables.RedirectURI,
             code_verifier: codeVerifier,
-            client_secret: clientSecret,
         });
+
+        const clientSecret = (EnvironmentVariables.CognitoClientSecret || '').trim();
+        if (!clientSecret) {
+            throw new Error(
+                'Missing Cognito client secret. In Amplify set REACT_APP_COGNITO_CLIENT_SECRET_TEST (test app) or REACT_APP_COGNITO_CLIENT_SECRET_PROD (prod app), or REACT_APP_COGNITO_CLIENT_SECRET as a single fallback — then rebuild.'
+            );
+        }
+        params.append('client_secret', clientSecret);
 
         const data = await exchangeAuthorizationCode(params);
 
