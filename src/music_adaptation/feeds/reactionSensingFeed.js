@@ -19,6 +19,7 @@
  * @property {{ amplitude: number, frequency: number }} nodding
  * @property {{ left: ReactionSensingHandRaiseSide, right: ReactionSensingHandRaiseSide }} handRaise
  * @property {{ left: string, right: string }} mediaPipeHandGestures
+ * @property {{ currentEnergy: number | null, targetEnergy: number | null }} [userStateSurvey]
  * @property {{ smiling: number, jawOpen: number }} [faceInstant]
  * @property {object|null} [faceTimelineWindow] compact summary of merged face blob (not full landmark arrays)
  */
@@ -31,6 +32,8 @@
  * @property {boolean} handsRaised
  * @property {boolean} thumbUpActive
  * @property {boolean} thumbDownActive
+ * @property {number | null} [currentEnergy]
+ * @property {number | null} [targetEnergy]
  * @property {ReactionSensingModalitiesDetail} [modalitiesDetail]
  */
 
@@ -38,6 +41,13 @@
 function finiteNum(v, fb = 0) {
     const n = typeof v === 'number' ? v : parseFloat(v);
     return Number.isFinite(n) ? n : fb;
+}
+
+/** @param {unknown} v @returns {number | null} */
+function finiteNullableNum(v) {
+    if (v === undefined || v === null || v === '') return null;
+    const n = typeof v === 'number' ? v : parseFloat(v);
+    return Number.isFinite(n) ? n : null;
 }
 
 /** @param {unknown} raw @returns {ReactionSensingHandRaiseSide} */
@@ -74,6 +84,10 @@ function normalizeModalitiesDetail(raw) {
               : undefined;
 
     const nod = o.nodding && typeof o.nodding === 'object' ? /** @type {Record<string, unknown>} */ (o.nodding) : {};
+    const userStateSurvey =
+        o.userStateSurvey && typeof o.userStateSurvey === 'object'
+            ? /** @type {Record<string, unknown>} */ (o.userStateSurvey)
+            : null;
 
     /** @type {ReactionSensingModalitiesDetail} */
     const out = {
@@ -95,6 +109,12 @@ function normalizeModalitiesDetail(raw) {
         out.faceInstant = {
             smiling: finiteNum(fi.smiling, 0),
             jawOpen: finiteNum(fi.jawOpen, 0),
+        };
+    }
+    if (userStateSurvey) {
+        out.userStateSurvey = {
+            currentEnergy: finiteNullableNum(userStateSurvey.currentEnergy),
+            targetEnergy: finiteNullableNum(userStateSurvey.targetEnergy),
         };
     }
     if (ftw !== undefined) {
@@ -126,6 +146,8 @@ export function emptyReactionSensingFeedSnapshot() {
         handsRaised: false,
         thumbUpActive: false,
         thumbDownActive: false,
+        currentEnergy: null,
+        targetEnergy: null,
     };
 }
 
@@ -145,6 +167,12 @@ export function normalizeReactionSensingFeed(raw) {
         nf !== undefined && nf !== null && typeof nf === 'number' && Number.isFinite(nf) ? nf : base.noddingFrequency;
 
     const modalitiesDetail = normalizeModalitiesDetail(raw.modalitiesDetail);
+    const currentEnergyFromRaw = finiteNullableNum(raw.currentEnergy);
+    const targetEnergyFromRaw = finiteNullableNum(raw.targetEnergy);
+    const currentEnergyFromDetail = modalitiesDetail?.userStateSurvey?.currentEnergy ?? null;
+    const targetEnergyFromDetail = modalitiesDetail?.userStateSurvey?.targetEnergy ?? null;
+    const currentEnergy = currentEnergyFromRaw ?? currentEnergyFromDetail ?? null;
+    const targetEnergy = targetEnergyFromRaw ?? targetEnergyFromDetail ?? null;
 
     return {
         emotionDataArray: Array.isArray(raw.emotionDataArray) ? raw.emotionDataArray : base.emotionDataArray,
@@ -153,6 +181,8 @@ export function normalizeReactionSensingFeed(raw) {
         handsRaised: !!raw.handsRaised,
         thumbUpActive: !!raw.thumbUpActive,
         thumbDownActive: !!raw.thumbDownActive,
+        currentEnergy,
+        targetEnergy,
         ...(modalitiesDetail !== undefined ? { modalitiesDetail } : {}),
     };
 }

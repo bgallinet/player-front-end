@@ -2,23 +2,26 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import logo from '../images/logo.png';
 import { useAuth } from '../contexts/AuthContext';
 import { useTutorial } from '../contexts/TutorialContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Container, Row, Col, Button, Image, Alert, Spinner } from 'react-bootstrap';
 import TutorialMessage from '../components/TutorialMessage';
-import LargeTutorialButton from '../buttons/LargeTutorialButton';
 import TypewriterText from '../styles/TypewriterText';
-import SignUpButton from '../buttons/SignUpButton';
 import LoginButton from '../buttons/LoginButton';
-import { Subtitle, Text, StyledCard } from '../styles/StyledComponents';
+import { Subtitle, Text } from '../styles/StyledComponents';
 import { secondaryColor } from '../utils/DisplaySettings';
 import { trackPageView } from '../hooks/pageViewTracker';
+import NewUserListeningSurveyForm from '../components/NewUserListeningSurveyForm';
 
 const Home = () => {
+    const showSoundCloudPlayer = false;
+    const showLocalPlayer = false;
+
     const urlParams = new URLSearchParams(window.location.search);
     const code = urlParams.get('code');
     const { idToken, handleLogout } = useAuth();
-    const { isTutorialMode, toggleTutorialMode } = useTutorial();
+    const { isTutorialMode } = useTutorial();
     const navigate = useNavigate();
+    const location = useLocation();
 
     const onLogout = () => {
         handleLogout();
@@ -26,6 +29,7 @@ const Home = () => {
     };
 
     const [homeTutorialDismissed, setHomeTutorialDismissed] = useState(false);
+    const [showNewUserListeningSurvey, setShowNewUserListeningSurvey] = useState(false);
 
     // Music library state (from WelcomePlayerPage)
     const [loading, setLoading] = useState(false);
@@ -33,6 +37,7 @@ const Home = () => {
     const folderInputRef = useRef(null);
 
     const isLoggedIn = !!idToken;
+    const authRequired = Boolean(location.state?.authRequired);
 
     // Track page view on component mount
     useEffect(() => {
@@ -40,16 +45,17 @@ const Home = () => {
             pageName: 'home',
             additionalData: {
                 has_auth_code: !!code,
-                is_authenticated: isLoggedIn,
-                is_tutorial_mode: isTutorialMode
+                is_authenticated: isLoggedIn
             }
         });
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // Supported audio file extensions
-    const supportedAudioExtensions = [
-        '.mp3', '.wav', '.flac', '.m4a', '.aac', '.ogg', '.wma', '.aiff', '.au'
-    ];
+    useEffect(() => {
+        if (location.state?.showNewUserListeningSurvey) {
+            setShowNewUserListeningSurvey(true);
+            navigate(location.pathname, { replace: true, state: {} });
+        }
+    }, [location.state, location.pathname, navigate]);
 
     // Handle folder selection
     const handleFolderSelect = useCallback(async (event) => {
@@ -82,7 +88,7 @@ const Home = () => {
                     messages={[
                         "Welcome to TuneTribes player! This is your home page where you can access all features.",
                         "Experience music with movement-responsive audio enhancement in the player.",
-                        "Try Demo Tracks to get started, connect SoundCloud to stream, or login to use your own music files."
+                        "Sign up or log in to access local and SoundCloud playback with movement-responsive audio enhancement."
                     ]}
                     position="top-center"
                     onClose={() => setHomeTutorialDismissed(true)}
@@ -99,7 +105,7 @@ const Home = () => {
                         style={{ maxWidth: '300px', marginBottom: '2rem' }}
                     />
                     <TypewriterText
-                        text="Be part of music"
+                        text="Music that moves with you."
                         speed={100}
                         delay={500}
                     />
@@ -110,165 +116,84 @@ const Home = () => {
             {!code && (
                 <Row className="justify-content-center" style={{ marginTop: '3rem' }}>
                     <Col xs={12} sm={10} md={8} lg={6}>
-                        <div className="text-center mb-4">
-                            <Subtitle>
-                                Experience music with movement-responsive audio enhancement
-                            </Subtitle>
-                        </div>
+                        {authRequired && !isLoggedIn && (
+                            <Alert variant="warning" className="mb-3 text-center">
+                                Please log in to access player pages.
+                            </Alert>
+                        )}
 
-                        {/* Demo Tracks */}
-                        <StyledCard className="mb-3">
-                            <div className="text-center">
-                                <Button
-                                    variant="outline-light"
-                                    onClick={() => navigate('/demoplayer')}
-                                    size="lg"
-                                    style={{
-                                        borderColor: secondaryColor,
-                                        transition: 'all 0.3s ease',
-                                        minWidth: '250px',
-                                        padding: '1rem 2rem'
-                                    }}
-                                    onMouseEnter={(e) => {
-                                        e.target.style.backgroundColor = secondaryColor;
-                                        e.target.style.borderColor = secondaryColor;
-                                        e.target.style.transform = 'translateY(-2px)';
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        e.target.style.backgroundColor = 'transparent';
-                                        e.target.style.borderColor = secondaryColor;
-                                        e.target.style.transform = 'translateY(0)';
-                                    }}
-                                >
-                                    Demo Tracks
-                                </Button>
+                        {!isLoggedIn ? (
+                            <div className="text-center mb-4">
+                                <LoginButton />
                             </div>
-                        </StyledCard>
-
-                        {/* SoundCloud */}
-                        <StyledCard className="mb-3">
-                            <div className="text-center">
-                                <Button
-                                    variant="outline-light"
-                                    onClick={() => navigate('/soundcloudplayer')}
-                                    size="lg"
-                                    style={{
-                                        borderColor: '#ff5500',
-                                        color: '#ff5500',
-                                        transition: 'all 0.3s ease',
-                                        minWidth: '250px',
-                                        padding: '1rem 2rem'
-                                    }}
-                                    onMouseEnter={(e) => {
-                                        e.target.style.backgroundColor = '#ff5500';
-                                        e.target.style.borderColor = '#ff5500';
-                                        e.target.style.color = 'white';
-                                        e.target.style.transform = 'translateY(-2px)';
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        e.target.style.backgroundColor = 'transparent';
-                                        e.target.style.borderColor = '#ff5500';
-                                        e.target.style.color = '#ff5500';
-                                        e.target.style.transform = 'translateY(0)';
-                                    }}
-                                >
-                                    SoundCloud
-                                </Button>
-                            </div>
-                            <div className="text-center mt-2">
-                                <Text style={{ fontSize: '0.85rem', color: '#ccc', opacity: 0.7 }}>
-                                    Stream from your SoundCloud library
-                                </Text>
-                            </div>
-                        </StyledCard>
-
-                        {/* Local Music Folder */}
-                        <StyledCard className="mb-3">
-                            {isLoggedIn ? (
-                                <>
-                                    {/* Folder Selection -- logged in */}
-                                    <div className="text-center mb-3">
-                                        <input
-                                            type="file"
-                                            ref={folderInputRef}
-                                            onChange={handleFolderSelect}
-                                            webkitdirectory=""
-                                            directory=""
-                                            style={{ display: 'none' }}
-                                        />
+                        ) : (
+                            <>
+                                <div className="d-flex flex-column align-items-center gap-3 mb-3">
+                                    <Button
+                                        variant="outline-light"
+                                        onClick={() => navigate('/testplayer')}
+                                        size="lg"
+                                        style={{ minWidth: '250px', padding: '1rem 2rem' }}
+                                    >
+                                        Test player
+                                    </Button>
+                                    {showSoundCloudPlayer && (
                                         <Button
                                             variant="outline-light"
-                                            onClick={() => folderInputRef.current?.click()}
+                                            onClick={() => navigate('/soundcloudplayer')}
                                             size="lg"
                                             style={{
-                                                borderColor: secondaryColor,
-                                                transition: 'all 0.3s ease',
+                                                borderColor: '#ff5500',
+                                                color: '#ff5500',
                                                 minWidth: '250px',
                                                 padding: '1rem 2rem'
                                             }}
-                                            onMouseEnter={(e) => {
-                                                e.target.style.backgroundColor = secondaryColor;
-                                                e.target.style.borderColor = secondaryColor;
-                                                e.target.style.transform = 'translateY(-2px)';
-                                            }}
-                                            onMouseLeave={(e) => {
-                                                e.target.style.backgroundColor = 'transparent';
-                                                e.target.style.borderColor = secondaryColor;
-                                                e.target.style.transform = 'translateY(0)';
-                                            }}
                                         >
-                                            {loading ? (
-                                                <>
-                                                    <Spinner animation="border" size="sm" className="me-2" />
-                                                    Loading...
-                                                </>
-                                            ) : (
-                                                'Choose Music Folder'
-                                            )}
+                                            SoundCloud
                                         </Button>
-                                    </div>
-                                    <div className="text-center">
-                                        <Text style={{ fontSize: '0.85rem', color: '#ccc', opacity: 0.7 }}>
-                                            Supported: {supportedAudioExtensions.join(', ')}
-                                        </Text>
-                                    </div>
-                                </>
-                            ) : (
-                                <>
-                                    {/* Login prompt -- not logged in */}
-                                    <div className="text-center mb-3">
-                                        <Text style={{ margin: 0, fontSize: '0.95rem' }}>
-                                            <strong>Local Music Folder</strong>
-                                        </Text>
-                                        <Text style={{ fontSize: '0.85rem', color: '#ccc', opacity: 0.7 }}>
-                                            Login to play music from your device
-                                        </Text>
-                                    </div>
-                                    <div className="d-flex justify-content-center gap-2">
-                                        <SignUpButton />
-                                        <LoginButton />
-                                    </div>
-                                </>
-                            )}
+                                    )}
+                                    {showLocalPlayer && (
+                                        <>
+                                            <input
+                                                type="file"
+                                                ref={folderInputRef}
+                                                onChange={handleFolderSelect}
+                                                webkitdirectory=""
+                                                directory=""
+                                                style={{ display: 'none' }}
+                                            />
+                                            <Button
+                                                variant="outline-light"
+                                                onClick={() => folderInputRef.current?.click()}
+                                                size="lg"
+                                                style={{
+                                                    borderColor: secondaryColor,
+                                                    minWidth: '250px',
+                                                    padding: '1rem 2rem'
+                                                }}
+                                            >
+                                                {loading ? (
+                                                    <>
+                                                        <Spinner animation="border" size="sm" className="me-2" />
+                                                        Loading...
+                                                    </>
+                                                ) : (
+                                                    'Choose Music Folder'
+                                                )}
+                                            </Button>
+                                        </>
+                                    )}
+                                </div>
+                                {error && (
+                                    <Alert variant="danger" className="mb-3">
+                                        {error}
+                                    </Alert>
+                                )}
+                            </>
+                        )}
 
-                            {error && (
-                                <Alert variant="danger" className="mt-3 mb-0">
-                                    {error}
-                                </Alert>
-                            )}
-                        </StyledCard>
-
-                        {/* Logout + Tutorial row */}
+                        {/* Logout row */}
                         <div className="d-flex justify-content-center gap-2 mt-4">
-                            <LargeTutorialButton
-                                onTutorialToggle={() => {
-                                    setHomeTutorialDismissed(false);
-                                    if (!isTutorialMode) {
-                                        toggleTutorialMode();
-                                    }
-                                }}
-                                disabled={isTutorialMode && !homeTutorialDismissed}
-                            />
                             {isLoggedIn && (
                                 <Button
                                     variant="outline-light"
@@ -282,6 +207,11 @@ const Home = () => {
                     </Col>
                 </Row>
             )}
+
+            <NewUserListeningSurveyForm
+                show={showNewUserListeningSurvey}
+                onHide={() => setShowNewUserListeningSurvey(false)}
+            />
         </Container>
     );
 }

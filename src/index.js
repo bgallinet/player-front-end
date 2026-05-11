@@ -4,6 +4,9 @@ import './styles/custom-bootstrap.scss';
 import './index.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
+import { installClientErrorReporting } from './utils/clientEnvironment';
+
+installClientErrorReporting();
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(

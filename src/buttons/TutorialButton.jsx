@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { useTutorial } from '../contexts/TutorialContext';
 import { secondaryColor } from '../utils/DisplaySettings';
 import tutorialIcon from '../images/tutorialicon.png';
 
@@ -32,6 +31,7 @@ import tutorialIcon from '../images/tutorialicon.png';
 const TutorialButton = ({ 
     tutorialDismissed, 
     setTutorialDismissed, 
+    onClick,
     size = '2rem',
     style = {},
     className = '',
@@ -39,7 +39,6 @@ const TutorialButton = ({
     showTooltip = true,
     tooltipText = 'Tutorial'
 }) => {
-    const { isTutorialMode, toggleTutorialMode } = useTutorial();
     const [isHovered, setIsHovered] = useState(false);
 
     const handleMouseEnter = () => {
@@ -51,11 +50,14 @@ const TutorialButton = ({
     };
 
     const handleClick = () => {
-        if (disabled || (isTutorialMode && !tutorialDismissed)) return;
-        
-        setTutorialDismissed(false);
-        if (!isTutorialMode) {
-            toggleTutorialMode();
+        if (disabled) return;
+
+        if (typeof onClick === 'function') {
+            onClick();
+        }
+
+        if (typeof setTutorialDismissed === 'function') {
+            setTutorialDismissed(false);
         }
     };
 
@@ -66,8 +68,8 @@ const TutorialButton = ({
         minHeight: size,
         boxSizing: 'border-box',
         flexShrink: 0,
-        cursor: disabled || (isTutorialMode && !tutorialDismissed) ? 'not-allowed' : 'pointer',
-        opacity: isHovered ? 0.8 : (disabled || (isTutorialMode && !tutorialDismissed) ? 0.5 : 1),
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        opacity: isHovered ? 0.8 : (disabled ? 0.5 : 1),
         userSelect: 'none',
         padding: '0.5rem',
         borderRadius: '0.25rem',

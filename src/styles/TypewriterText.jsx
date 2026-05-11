@@ -3,33 +3,61 @@ import { secondaryColor } from '../utils/DisplaySettings';
 
 const TypewriterText = ({ 
     text, 
-    speed = 100, 
-    delay = 1000,
+    speed = 20, 
+    delay = 0,
     style = {},
     className = ""
 }) => {
     const [displayText, setDisplayText] = useState('');
-    const [currentIndex, setCurrentIndex] = useState(0);
     const [isComplete, setIsComplete] = useState(false);
 
     useEffect(() => {
-        if (currentIndex < text.length) {
-            const timer = setTimeout(() => {
-                setDisplayText(prev => prev + text[currentIndex]);
-                setCurrentIndex(prev => prev + 1);
-            }, speed);
-            return () => clearTimeout(timer);
-        } else {
+        const content = typeof text === 'string' ? text : '';
+        if (!content.length) {
+            setDisplayText('');
             setIsComplete(true);
+            return;
         }
-    }, [currentIndex, text, speed]);
 
-    // Reset animation when text changes
-    useEffect(() => {
         setDisplayText('');
-        setCurrentIndex(0);
         setIsComplete(false);
-    }, [text]);
+
+        const safeSpeed = Math.max(1, Number(speed) || 1);
+        const safeDelay = Math.max(0, Number(delay) || 0);
+        let animationFrameId = null;
+        let startTimeMs = null;
+
+        const tick = (timestampMs) => {
+            if (startTimeMs === null) {
+                startTimeMs = timestampMs;
+            }
+            const elapsedMs = timestampMs - startTimeMs;
+            if (elapsedMs < safeDelay) {
+                animationFrameId = window.requestAnimationFrame(tick);
+                return;
+            }
+
+            const typingElapsedMs = elapsedMs - safeDelay;
+            const nextCharCount = Math.min(
+                content.length,
+                Math.floor(typingElapsedMs / safeSpeed)
+            );
+            setDisplayText(content.slice(0, nextCharCount));
+
+            if (nextCharCount >= content.length) {
+                setIsComplete(true);
+                return;
+            }
+            animationFrameId = window.requestAnimationFrame(tick);
+        };
+
+        animationFrameId = window.requestAnimationFrame(tick);
+        return () => {
+            if (animationFrameId !== null) {
+                window.cancelAnimationFrame(animationFrameId);
+            }
+        };
+    }, [text, speed, delay]);
 
     return (
         <div 

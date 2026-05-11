@@ -8,7 +8,6 @@ import TermsOfUseAnnex from '../components/TermsOfUseAnnex';
 import { initiateLogin } from '../utils/Auth';
 import AnalyticsAPI from '../utils/AnalyticsAPI';
 import { getSessionNameFromUrl } from '../hooks/sessionUtils';
-import { isDemoSession, getDemoUsername } from '../hooks/demoUserManager';
 import { fetchExperiment } from '../hooks/useExperiment';
 
 /**
@@ -48,9 +47,8 @@ const SignUpButton = () => {
                 'element_id': 'signup_button_click',
                 'page_url': window.location.href,
                 'session_name': getSessionNameFromUrl(),
-                ...(isDemoSession() && { 'user_name': getDemoUsername() })
             });
-            AnalyticsAPI(analyticsData, !isDemoSession());
+            AnalyticsAPI(analyticsData, false);
         } catch (error) {
             console.error('Analytics API error:', error);
         }
@@ -80,9 +78,9 @@ const SignUpButton = () => {
                     'experiment_config': experiment?.config || {},
                     'conversion': true
                 },
-                'user_name': experiment?.username || getDemoUsername()
+                    ...(experiment?.username && { 'user_name': experiment.username })
             });
-            AnalyticsAPI(analyticsData, !isDemoSession());
+            AnalyticsAPI(analyticsData, false);
         } catch (error) {
             console.error('Analytics API error:', error);
         }

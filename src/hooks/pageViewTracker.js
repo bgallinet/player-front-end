@@ -6,14 +6,28 @@
  * - Page URL
  * - Referrer
  * - Viewport dimensions
- * - User identification (authenticated or demo)
  * - Session information
  */
 
 import React from 'react';
-import { getDemoUsername, isDemoSession } from './demoUserManager';
 import AnalyticsAPI from '../utils/AnalyticsAPI';
 import UserAPI from '../utils/UserAPI';
+
+// React StrictMode in development can run effects twice; suppress duplicate page-view events.
+const PAGE_VIEW_DEDUP_WINDOW_MS = 1500;
+let lastPageViewFingerprint = null;
+let lastPageViewTimestamp = 0;
+
+const shouldSkipDuplicatePageView = (fingerprint) => {
+    const now = Date.now();
+    const isDuplicate =
+        lastPageViewFingerprint === fingerprint &&
+        now - lastPageViewTimestamp < PAGE_VIEW_DEDUP_WINDOW_MS;
+
+    lastPageViewFingerprint = fingerprint;
+    lastPageViewTimestamp = now;
+    return isDuplicate;
+};
 
 /**
  * Track a page view
@@ -36,9 +50,6 @@ export const trackPageView = async (options = {}) => {
         const viewportWidth = window.innerWidth;
         const viewportHeight = window.innerHeight;
 
-        // Determine if this is a demo session
-        const isDemo = isDemoSession();
-
         // Prepare the page view data
         const pageViewData = {
             request_type: 'analytics',
@@ -51,19 +62,25 @@ export const trackPageView = async (options = {}) => {
             ...additionalData
         };
 
-        // Add user identification
-        if (isDemo) {
-            pageViewData.user_name = getDemoUsername();
-            pageViewData.session_name = 'demo-session';
+        const fingerprint = JSON.stringify({
+            page_name: pageViewData.page_name,
+            page_url: pageViewData.page_url,
+            interaction_type: pageViewData.interaction_type,
+            is_authenticated: Boolean(localStorage.getItem('idToken')),
+            additional_data: additionalData
+        });
+
+        if (shouldSkipDuplicatePageView(fingerprint)) {
+            return;
         }
 
         console.log('Tracking page view:', pageViewData);
 
         // Send to appropriate API based on authentication status
-        if (isDemo) {
-            await AnalyticsAPI(JSON.stringify(pageViewData));
-        } else {
+        if (localStorage.getItem('idToken')) {
             await UserAPI(JSON.stringify(pageViewData));
+        } else {
+            await AnalyticsAPI(JSON.stringify(pageViewData));
         }
 
         // Store page entry time for time_on_page calculation
@@ -96,8 +113,6 @@ export const trackPageExit = () => {
  */
 export const trackScrollDepth = async (scrollDepth) => {
     try {
-        const isDemo = isDemoSession();
-        
         const scrollData = {
             request_type: 'analytics',
             interaction_type: 'scroll_tracking',
@@ -106,16 +121,11 @@ export const trackScrollDepth = async (scrollDepth) => {
             timestamp: Date.now()
         };
 
-        if (isDemo) {
-            scrollData.user_name = getDemoUsername();
-            scrollData.session_name = 'demo-session';
-        }
-
         // Send scroll tracking data
-        if (isDemo) {
-            await AnalyticsAPI(JSON.stringify(scrollData));
-        } else {
+        if (localStorage.getItem('idToken')) {
             await UserAPI(JSON.stringify(scrollData));
+        } else {
+            await AnalyticsAPI(JSON.stringify(scrollData));
         }
     } catch (error) {
         console.error('Error tracking scroll depth:', error);

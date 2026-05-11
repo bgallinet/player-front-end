@@ -41,7 +41,17 @@ const PrivacyNoticeAnnex = () => {
             <p>We may update this Privacy Notice to reflect changes in our practices or for legal reasons. We will notify you of significant changes through the app or other communication channels.</p>
 
             <h2 className="mb-3">Contact</h2>
-            <p>For any privacy-related questions or concerns, please contact us at info@tunetribes.live</p>
+            <p>
+                For any privacy-related questions or concerns, please{' '}
+                <a
+                    href="https://www.tunetribes.live/contact"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                >
+                    contact us
+                </a>
+                .
+            </p>
         </>
     );
 };

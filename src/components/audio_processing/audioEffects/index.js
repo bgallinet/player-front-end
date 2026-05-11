@@ -39,6 +39,14 @@ export {
     BPM_SHIFT_PERCENT_MAX,
 } from './bpmShift';
 
+export {
+    applyBpmKeyShift,
+    resetBpmKeyShift,
+    clampBpmKeyShiftPercent,
+    BPM_KEY_SHIFT_PERCENT_MIN,
+    BPM_KEY_SHIFT_PERCENT_MAX,
+} from './bpmKeyShift';
+
 export const AUDIO_EFFECTS = {
     rhythmicEnhancement: {
         createProcessor: createRhythmicEnhancementProcessor,

@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { getDemoUsername, isDemoSession } from './demoUserManager';
 import AnalyticsAPI from '../utils/AnalyticsAPI';
 
 /**
@@ -9,17 +8,9 @@ import AnalyticsAPI from '../utils/AnalyticsAPI';
  */
 export const fetchExperiment = async (experimentName) => {
     try {
-        // Get current username (logged in or demo)
+        // Use stable cohort names for authenticated vs anonymous users.
         const idToken = localStorage.getItem('idToken');
-        const demoUsername = getDemoUsername();
-        let username = idToken ? 'authenticated_user' : demoUsername;
-        
-        // TEST: Replace demo username suffix with random for testing different variants
-/*         if (!idToken) {
-            const baseUsername = 'demo_user_';
-            const randomSuffix = Math.random().toString(36).substr(2, 9);
-            username = `${baseUsername}${randomSuffix}`;
-        } */
+        const username = idToken ? 'authenticated_user' : 'anonymous_user';
         
         // Prepare analytics data
         const analyticsData = JSON.stringify({
@@ -30,7 +21,7 @@ export const fetchExperiment = async (experimentName) => {
         });
         
         // Call backend API using AnalyticsAPI
-        const responseData = await AnalyticsAPI(analyticsData, !isDemoSession());
+        const responseData = await AnalyticsAPI(analyticsData, Boolean(idToken));
         
         // Handle response body
         let body = responseData.body;
@@ -64,8 +55,7 @@ export const fetchExperiment = async (experimentName) => {
         }
     } catch (error) {
         console.error('Error fetching experiment:', error);
-        const demoUsername = getDemoUsername();
-        let username = isDemoSession() ? demoUsername : 'authenticated_user';
+        const username = localStorage.getItem('idToken') ? 'authenticated_user' : 'anonymous_user';
         return {
             variant_name: 'control',
             is_control: true,

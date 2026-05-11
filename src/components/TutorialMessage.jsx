@@ -4,11 +4,11 @@ import { useTutorial } from '../contexts/TutorialContext';
 import tutorialIcon from '../images/tutorialicon.png';
 import TypewriterText from '../styles/TypewriterText';
 
-const TutorialMessage = ({ messages, position = 'top-center', onClose }) => {
-    const { isTutorialMode, disableTutorialMode } = useTutorial();
+const TutorialMessage = ({ messages, position = 'top-center', onClose, forceShow = false }) => {
+    const { isTutorialMode } = useTutorial();
     const [currentMessageIndex, setCurrentMessageIndex] = useState(0);
 
-    if (!isTutorialMode) return null;
+    if (!forceShow && !isTutorialMode) return null;
 
     // Handle single string input for backward compatibility
     const messageArray = Array.isArray(messages) ? messages : [messages];
@@ -72,8 +72,6 @@ const TutorialMessage = ({ messages, position = 'top-center', onClose }) => {
             <div style={{ marginBottom: '1rem', minHeight: '120px' }}>
                 <TypewriterText 
                     text={currentMessage}
-                    speed={20}
-                    delay={100}
                     style={{
                         color: 'white',
                         fontSize: '0.9rem',
@@ -109,19 +107,6 @@ const TutorialMessage = ({ messages, position = 'top-center', onClose }) => {
                     }}
                 >
                     {isLastMessage ? 'Got it' : 'Next'}
-                </Button>
-                <Button
-                    size="sm"
-                    variant="outline-danger"
-                    onClick={disableTutorialMode}
-                    style={{ 
-                        fontSize: '0.8rem',
-                        color: 'white',
-                        borderColor: '#dc3545',
-                        backgroundColor: 'transparent'
-                    }}
-                >
-                    Disable Tutorial
                 </Button>
             </div>
         </div>

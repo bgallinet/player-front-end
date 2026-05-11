@@ -13,16 +13,20 @@ import {
     CUE_RING_SAMPLE_HZ,
 } from '../../hooks/ReactionMapperConfig';
 import { CUE_CHANNEL_IDS_V1 } from '../schema/cueSchema.v1';
+import { BPM_SHIFT_PERCENT_MAX, BPM_SHIFT_PERCENT_MIN } from '../../components/audio_processing/audioEffects/bpmShift';
 import { normalizeReactionSensingFeed } from '../feeds/reactionSensingFeed';
 import { normalizeReactionPolicyBundle } from './reactionPolicyBundle';
 import { visionCuePatchFromDatapoint } from '../adapters/visionCueAdapter';
 import { gestureCuePatchFromFlags, gestureBooleansFromMeanWindow } from '../adapters/gestureCueAdapter';
 import { tensorMeanByChannel, tensorLatestRowRecord } from './tensorChannelStats';
 import { analyzeDominantFaceToneFromChannelMeans } from './dominantFaceFromChannels';
-import { deriveReactionPlaybackProfile } from './reactionPlaybackProfiles.v1';
+import {
+    deriveReactionPlaybackProfile,
+    DOMINANT_FACE_TONE,
+    REACTION_PLAYBACK_PROFILE,
+} from './fixed_mappings/reactionPlaybackProfiles.v1';
 import { buildBaselineRecommendation } from './baselineRecommendation';
 import { mergeDeclarativeRules, getDeclarativeRulesRuntime } from './declarativeReactionRules';
-import { computeNodBpmShiftPercent } from './nodBpmAdapt.v1';
 
 function finiteTs(ts) {
     const n = typeof ts === 'number' ? ts : parseFloat(ts);
@@ -83,10 +87,12 @@ export function ingestSensingFeedIntoBuffer(buffer, feed, nowMs = Date.now()) {
  *   buffer: import('../timeline/CueRingBuffer').CueRingBuffer,
  *   policyBundle: import('./reactionPolicyBundle').ReactionPolicyBundleSnapshot,
  *   prevDominantFaceToneRef: { current: string | null },
+ *   persistentThumbBpmStateRef?: { current: { persistentDeltaBpm: number, prevThumbUpActive: boolean, prevThumbDownActive: boolean } },
  *   analysisWindowMs?: number,
  *   sampleHz?: number,
  *   nowMs?: number,
  *   nodTrackBpm?: number | null,
+ *   latestSensingFeed?: import('../feeds/reactionSensingFeed').ReactionSensingFeedSnapshot | null,
  * }} args
  */
 export function compileReactionRecommendation(args) {
@@ -94,22 +100,30 @@ export function compileReactionRecommendation(args) {
         buffer,
         policyBundle,
         prevDominantFaceToneRef,
+        persistentThumbBpmStateRef,
         analysisWindowMs = EMOTION_ANALYSIS_WINDOW,
         sampleHz = CUE_RING_SAMPLE_HZ,
         nowMs = Date.now(),
         nodTrackBpm = null,
+        latestSensingFeed = null,
     } = args;
 
     const pb = normalizeReactionPolicyBundle(policyBundle);
     const declarativeRules = pb.declarativeRules ?? getDeclarativeRulesRuntime();
+    const thumbTempoStepBpm = Number.isFinite(Number(pb.thumbTempoStepBpm))
+        ? Number(pb.thumbTempoStepBpm)
+        : 3;
 
     const tensor = buffer.sampleWindow(analysisWindowMs, sampleHz, nowMs);
     const channelIds = [...CUE_CHANNEL_IDS_V1];
     const meanWindow = tensorMeanByChannel(tensor, channelIds);
     const latest = tensorLatestRowRecord(tensor, channelIds);
 
-    /** @type {string|null} */
-    let dominantFaceTone = null;
+    /** @type {string} */
+    let dominantFaceTone =
+        prevDominantFaceToneRef.current && typeof prevDominantFaceToneRef.current === 'string'
+            ? prevDominantFaceToneRef.current
+            : DOMINANT_FACE_TONE.NEUTRAL;
     if (tensor.frameCount >= MIN_DATA_POINTS_REQUIRED) {
         dominantFaceTone = analyzeDominantFaceToneFromChannelMeans(meanWindow, prevDominantFaceToneRef.current);
         prevDominantFaceToneRef.current = dominantFaceTone;
@@ -123,11 +137,49 @@ export function compileReactionRecommendation(args) {
         nodAmp > THRESHOLD_NODDING;
 
     const meanNodHz = Number(meanWindow['vision.face.nod_frequency']) || 0;
-    const nodBpmShiftPercentOverride = computeNodBpmShiftPercent(meanNodHz, isNodding, nodTrackBpm);
+    const nodBpmShiftPercentOverride = null;
 
     const { handsRaised, thumbUpActive, thumbDownActive } = gestureBooleansFromMeanWindow(meanWindow);
+    const thumbBpmState = persistentThumbBpmStateRef?.current;
+    if (thumbBpmState) {
+        if (thumbUpActive && !thumbBpmState.prevThumbUpActive) {
+            const previousDelta = Number(thumbBpmState.persistentDeltaBpm) || 0;
+            thumbBpmState.persistentDeltaBpm =
+                previousDelta + thumbTempoStepBpm;
+            console.log('[Thumb BPM] dynamic increase applied', {
+                direction: 'up',
+                stepBpm: thumbTempoStepBpm,
+                previousPersistentDeltaBpm: previousDelta,
+                nextPersistentDeltaBpm: thumbBpmState.persistentDeltaBpm,
+            });
+        }
+        if (thumbDownActive && !thumbBpmState.prevThumbDownActive) {
+            const previousDelta = Number(thumbBpmState.persistentDeltaBpm) || 0;
+            thumbBpmState.persistentDeltaBpm =
+                previousDelta - thumbTempoStepBpm;
+            console.log('[Thumb BPM] dynamic decrease applied', {
+                direction: 'down',
+                stepBpm: thumbTempoStepBpm,
+                previousPersistentDeltaBpm: previousDelta,
+                nextPersistentDeltaBpm: thumbBpmState.persistentDeltaBpm,
+            });
+        }
+        thumbBpmState.prevThumbUpActive = !!thumbUpActive;
+        thumbBpmState.prevThumbDownActive = !!thumbDownActive;
+    }
 
-    const playbackProfile = deriveReactionPlaybackProfile({
+    const currentEnergy =
+        typeof latestSensingFeed?.currentEnergy === 'number' && Number.isFinite(latestSensingFeed.currentEnergy)
+            ? latestSensingFeed.currentEnergy
+            : null;
+    const targetEnergy =
+        typeof latestSensingFeed?.targetEnergy === 'number' && Number.isFinite(latestSensingFeed.targetEnergy)
+            ? latestSensingFeed.targetEnergy
+            : null;
+    const energyDelta =
+        currentEnergy !== null && targetEnergy !== null ? targetEnergy - currentEnergy : null;
+
+    let playbackProfile = deriveReactionPlaybackProfile({
         dominantFaceTone,
         noddingAmplitude: nodAmp,
         handsRaised,
@@ -135,9 +187,14 @@ export function compileReactionRecommendation(args) {
         thumbDownActive,
     });
 
+    // Allow policy evaluation to run for energy-only mappings even when face/gesture profile is absent.
+    if (!playbackProfile && energyDelta !== null) {
+        playbackProfile = REACTION_PLAYBACK_PROFILE.NEUTRAL;
+    }
+
     if (!playbackProfile) return null;
 
-    const baseline = buildBaselineRecommendation({
+    const baselineRaw = buildBaselineRecommendation({
         playbackProfile,
         dominantFaceTone,
         noddingAmplitude: nodAmp,
@@ -156,6 +213,20 @@ export function compileReactionRecommendation(args) {
         nodBpmShiftPercentOverride,
         meanNodFrequencyHz: meanNodHz,
     });
+    const persistentDeltaBpm = Number(thumbBpmState?.persistentDeltaBpm) || 0;
+    // Apply thumb accumulator directly in BPM shift control units so each gesture uses the configured step.
+    const bpmShiftWithThumbPersistence = (Number(baselineRaw.bpmShiftPercent) || 0) + persistentDeltaBpm;
+    const clampedBpmShiftPercent = Math.max(
+        BPM_SHIFT_PERCENT_MIN,
+        Math.min(BPM_SHIFT_PERCENT_MAX, bpmShiftWithThumbPersistence),
+    );
+    const baseline = {
+        ...baselineRaw,
+        bpmShiftPercent: clampedBpmShiftPercent,
+        persistentThumbBpmDeltaBpm: persistentDeltaBpm,
+        currentEnergy,
+        targetEnergy,
+    };
 
     const ctx = {
         latest,
@@ -164,6 +235,9 @@ export function compileReactionRecommendation(args) {
         emotionState: playbackProfile,
         dominantFaceTone,
         dominantEmotion: dominantFaceTone,
+        currentEnergy,
+        targetEnergy,
+        energyDelta,
     };
 
     return mergeDeclarativeRules(ctx, baseline, declarativeRules);

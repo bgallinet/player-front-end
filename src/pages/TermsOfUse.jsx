@@ -16,7 +16,7 @@ const TermsOfUse = () => {
                         </p>
 
                         <p className="mb-4">
-                            Welcome to TuneTribes! These Terms of Use ("Terms") govern your use of our music streaming and audience engagement platform. By accessing or using our service, you agree to be bound by these Terms.
+                            Welcome to TuneTribes! These Terms of Use (&quot;Terms&quot;) govern your use of our adaptive music software—the app that responds to your context and sensors to shape how you hear music. By accessing or using our service, you agree to be bound by these Terms.
                         </p>
 
                         <TermsOfUseAnnex />

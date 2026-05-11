@@ -41,11 +41,11 @@ import {
 import {
     resolveKeyShiftForPlaybackProfile as resolveKeyShiftSemitonesForEmotion,
     resolveVolumeMultiplierForPlaybackProfile as resolveVolumeMultiplierForEmotion,
-} from '../../music_adaptation/policy/reactionMappingDefaults.v1';
+} from '../../music_adaptation/policy/fixed_mappings/reactionMappingDefaults.v1';
 import {
     REACTION_PLAYBACK_PROFILE_UI_ROWS,
     REACTION_PLAYBACK_PROFILE,
-} from '../../music_adaptation/policy/reactionPlaybackProfiles.v1';
+} from '../../music_adaptation/policy/fixed_mappings/reactionPlaybackProfiles.v1';
 import {
     BPM_SHIFT_PERCENT_MIN,
     BPM_SHIFT_PERCENT_MAX
