@@ -39,6 +39,10 @@ const CognitoURL = 'https://d3o5hrtbl653it.auth.eu-west-3.amazoncognito.com/oaut
 const SC_ClientID = process.env.REACT_APP_SC_CLIENT_ID || '';
 const SC_ClientSecret = process.env.REACT_APP_SC_CLIENT_SECRET || '';
 
+// Cognito confidential client secret (test/prod token exchange). Must match the app client for ClientID.
+// Set REACT_APP_COGNITO_CLIENT_SECRET in Amplify / CI — never commit the real secret.
+const CognitoClientSecret = process.env.REACT_APP_COGNITO_CLIENT_SECRET || '';
+
 const EnvironmentVariables = {
     AuthURL: AuthURL,
     UserAPI_URL: `${API_gateway_url}/process-data`,
@@ -49,9 +53,12 @@ const EnvironmentVariables = {
     RedirectURI: RedirectURI,
     CognitoURL: CognitoURL,
     ClientID: ClientID,
+    CognitoClientSecret: CognitoClientSecret,
     environment_flag: environment_flag,
     generateCodeVerifier: generateCodeVerifier,
-    generateCodeChallenge: generateCodeChallenge
+    generateCodeChallenge: generateCodeChallenge,
+    SC_ClientID: SC_ClientID,
+    SC_ClientSecret: SC_ClientSecret,
 };
 
 export default EnvironmentVariables;
