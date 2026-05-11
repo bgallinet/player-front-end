@@ -2,7 +2,6 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Container, Alert, Button } from 'react-bootstrap';
 import { Text } from '../../styles/StyledComponents';
 import { secondaryColor } from '../../utils/DisplaySettings';
-import TutorialMessage from '../TutorialMessage';
 import Deck from './Deck';
 import DeckControls from './DeckControls';
 import AudioDeviceSelector from './AudioDeviceSelector';
@@ -11,14 +10,14 @@ import AdaptationOrchestrator, {
     createBuiltinStaticReactionPolicyInstance,
     EQ_PRESETS,
 } from './AdaptationOrchestrator';
-import { useTutorial } from '../../contexts/TutorialContext';
-import { getDemoUsername, isDemoSession } from '../../hooks/demoUserManager';
 import AudioDeviceButton from '../../buttons/AudioDeviceButton';
 import SettingsButton from '../../buttons/SettingsButton';
-import TutorialButton from '../../buttons/TutorialButton';
 import { trackPageView } from '../../hooks/pageViewTracker';
+import { trackSimpleEvent } from '../../hooks/simpleTracker';
 import logoSmall from '../../images/logo_small.png';
 import { useAudioGraphCompiler } from '../../hooks/useAudioGraphCompiler';
+import { usePlaybackSessionAnalytics } from './usePlaybackSessionAnalytics';
+import { useDeckTransport } from './useDeckTransport';
 
 function resolveDeckArtworkUrl(source) {
     if (!source?.artwork_url || typeof source.artwork_url !== 'string') {
@@ -28,29 +27,16 @@ function resolveDeckArtworkUrl(source) {
     return url.includes('-large') ? url.replace('-large', '-t300x300') : url;
 }
 
-/** Prefer React state duration; fall back to element (HLS/live can populate seekable before duration settles). */
-function resolveMediaDuration(audioEl, stateDuration) {
-    if (Number.isFinite(stateDuration) && stateDuration > 0) {
-        return stateDuration;
-    }
-    if (audioEl && Number.isFinite(audioEl.duration) && audioEl.duration > 0) {
-        return audioEl.duration;
-    }
-    try {
-        if (audioEl?.seekable?.length) {
-            const end = audioEl.seekable.end(audioEl.seekable.length - 1);
-            if (Number.isFinite(end) && end > 0) return end;
-        }
-    } catch {
-        // ignore
-    }
-    return 0;
+function resolvePlayerSessionName(pageName) {
+    if (pageName === 'test-player') return 'TestPlayer_20260504_BPM_energy';
+    if (pageName === 'local-player') return 'LocalPlayer';
+    if (pageName === 'soundcloud-player') return 'SoundCloudPlayer';
+    return pageName || 'Player';
 }
 
 const Player = ({
     // Audio source
     selectedFile,
-    isDemoTrack = false,
     audioRef: externalAudioRef,
     deckBAudioRef: externalDeckBAudioRef,
     
@@ -71,19 +57,27 @@ const Player = ({
     // Page tracking
     pageName = 'player',
 
-    /** Shown on deck A when the track has no `artwork_url` (e.g. local/demo hero image) */
+    /** Shown on deck A when the track has no `artwork_url` (e.g. local hero image) */
     fallbackDeckArtworkSrc,
     /** Deck A transport status (e.g. SoundCloud stream loading) */
     deckATrackStatusMessage,
     deckATrackStatusLoading = false,
 
     /** When true, pressing Play bumps a counter so Face landmark / detection can start if idle */
-    autoStartLandmarkWithMusic = true
+    autoStartLandmarkWithMusic = true,
+    /** Show/hide the "Second track" deck toggle controls. */
+    enableSecondDeck = true,
+    /** Show/hide previous/next transport controls on deck A. */
+    enableTrackNavigation = true,
+    /** Show/hide stop transport controls. */
+    enableStopButton = true,
+    /** Optional initial reaction policy instance for page-specific defaults. */
+    initialReactionPolicyInstance = null,
+    /** Optional context tutorial button for deck A. */
+    showTutorialButton = false,
+    onTutorialButtonClick = null,
 }) => {
     // Audio state
-    const [isPlaying, setIsPlaying] = useState(false);
-    const [duration, setDuration] = useState(0);
-    const [currentTime, setCurrentTime] = useState(0);
     const [error, setError] = useState('');
     
     const [secondDeckActive, setSecondDeckActive] = useState(false);
@@ -95,9 +89,17 @@ const Player = ({
     const [baseVolumeDeckB, setBaseVolumeDeckB] = useState(0.5);
     const [stream, setStream] = useState(null);
 
-    const [reactionPolicyInstance, setReactionPolicyInstance] = useState(() =>
-        createBuiltinStaticReactionPolicyInstance(),
+    const initialReactionPolicyInstanceRef = useRef(
+        initialReactionPolicyInstance || createBuiltinStaticReactionPolicyInstance(),
     );
+    const [reactionPolicyInstance, setReactionPolicyInstance] = useState(
+        () => initialReactionPolicyInstanceRef.current,
+    );
+    useEffect(() => {
+        if (!initialReactionPolicyInstance || typeof initialReactionPolicyInstance !== 'object') return;
+        initialReactionPolicyInstanceRef.current = initialReactionPolicyInstance;
+        setReactionPolicyInstance(initialReactionPolicyInstance);
+    }, [initialReactionPolicyInstance]);
 
     const {
         eqMappings,
@@ -116,21 +118,14 @@ const Player = ({
     const [showAudioModal, setShowAudioModal] = useState(false);
     const [loadedDeckATrack, setLoadedDeckATrack] = useState(null);
     const [loadedDeckBTrack, setLoadedDeckBTrack] = useState(null);
-    const [isPlayingDeckB, setIsPlayingDeckB] = useState(false);
-    const [durationDeckB, setDurationDeckB] = useState(0);
-    const [currentTimeDeckB, setCurrentTimeDeckB] = useState(0);
     
-    // Demo session logic
-    const [is_demo_session, setIsDemoSession] = useState(false);
-    const [demo_username, setDemoUsername] = useState(() => getDemoUsername());
-    
-    // Tutorial functionality
-    const { isTutorialMode, toggleTutorialMode } = useTutorial();
-    const [playerTutorialDismissed, setPlayerTutorialDismissed] = useState(false);
     const [landmarkAutoStartTick, setLandmarkAutoStartTick] = useState(0);
     const [detectionForceStopTick, setDetectionForceStopTick] = useState(0);
     const [deckASoundConsoleOpen, setDeckASoundConsoleOpen] = useState(false);
     const [deckBSoundConsoleOpen, setDeckBSoundConsoleOpen] = useState(false);
+    const isTrackSwitchingRef = useRef(false);
+    const previousThumbDeltaRef = useRef(0);
+    const previousBpmShiftPercentRef = useRef(0);
 
     const internalAudioRef = useRef(null);
     const audioRef = externalAudioRef || internalAudioRef;
@@ -141,6 +136,7 @@ const Player = ({
     reactionPolicyBundleRef.current = reactionPolicyInstance;
 
     const applyRecommendationToConsole = useAudioGraphCompiler(audioRef);
+    const playerSessionName = resolvePlayerSessionName(pageName);
     // Track page view on component mount (guard against StrictMode double-invocation)
     const hasTrackedPageView = useRef(false);
     useEffect(() => {
@@ -149,10 +145,9 @@ const Player = ({
             trackPageView({
                 pageName: pageName,
                 additionalData: {
+                    session_name: playerSessionName,
                     has_camera: !!stream,
-                    is_demo_session: is_demo_session,
                     has_selected_file: !!selectedFile,
-                    is_demo_track: isDemoTrack
                 }
             });
         }
@@ -273,10 +268,7 @@ const Player = ({
         }));
     };
     
-    // Handle reset to default mappings
-    const handleResetToDefaults = () => {
-        setReactionPolicyInstance(createBuiltinStaticReactionPolicyInstance());
-    };
+ 
 
     // Handle volume change
     const handleVolumeChange = useCallback((newVolume) => {
@@ -291,25 +283,113 @@ const Player = ({
         setBaseVolumeDeckB(volumeValue);
     }, []);
 
+    const resolveActiveTrackName = useCallback(() => {
+        return (
+            loadedDeckATrack?.displayName ||
+            selectedFile?.name ||
+            selectedFile?.title ||
+            selectedFile?.fileName ||
+            'unknown_track'
+        );
+    }, [loadedDeckATrack, selectedFile]);
+
+    const resolveActiveSongId = useCallback(() => {
+        const candidates = [
+            loadedDeckATrack?.songId,
+            loadedDeckATrack?.id,
+            selectedFile?.songId,
+            selectedFile?.track_id,
+            selectedFile?.trackId,
+            selectedFile?.id,
+        ];
+        for (const candidate of candidates) {
+            if (candidate === null || candidate === undefined) continue;
+            if (typeof candidate === 'number' && Number.isFinite(candidate)) {
+                return candidate;
+            }
+            const asText = String(candidate);
+            const numericFromSuffix = asText.match(/(\d+)$/);
+            if (numericFromSuffix) {
+                return Number(numericFromSuffix[1]);
+            }
+            const parsed = Number(asText);
+            if (Number.isFinite(parsed)) {
+                return parsed;
+            }
+        }
+        return null;
+    }, [loadedDeckATrack, selectedFile]);
+
+    const resolveActiveTrackBaseBpm = useCallback(() => {
+        const candidates = [
+            loadedDeckATrack?.bpm,
+            selectedFile?.bpm,
+            selectedFile?.BPM,
+            selectedFile?.track_bpm,
+        ];
+        for (const candidate of candidates) {
+            const n = Number(candidate);
+            if (Number.isFinite(n) && n > 0) {
+                return n;
+            }
+        }
+        const fallbackBpm = Number(window.localStorage.getItem('calibration_original_bpm'));
+        return Number.isFinite(fallbackBpm) && fallbackBpm > 0 ? fallbackBpm : null;
+    }, [loadedDeckATrack, selectedFile]);
+
     const handleReactionCompileOutput = useCallback(
         (output) => {
-            setCurrentRecommendation(output.recommendation);
+            const recommendation = output?.recommendation || null;
+            const nextThumbDelta = Number(recommendation?.persistentThumbBpmDeltaBpm) || 0;
+            const prevThumbDelta = Number(previousThumbDeltaRef.current) || 0;
+            const thumbDeltaChange = nextThumbDelta - prevThumbDelta;
+            const commandType =
+                thumbDeltaChange > 0 ? 'thumbs_up' : thumbDeltaChange < 0 ? 'thumbs_down' : null;
+
+            if (commandType) {
+                const baseBpm = resolveActiveTrackBaseBpm();
+                const songId = resolveActiveSongId();
+                const previousBpmShiftPercent = Number(previousBpmShiftPercentRef.current) || 0;
+                const nextBpmShiftPercent = Number(recommendation?.bpmShiftPercent) || 0;
+                const oldBpm =
+                    Number.isFinite(baseBpm) && baseBpm > 0
+                        ? baseBpm * (1 + previousBpmShiftPercent / 100)
+                        : null;
+                const newBpm =
+                    Number.isFinite(baseBpm) && baseBpm > 0
+                        ? baseBpm * (1 + nextBpmShiftPercent / 100)
+                        : null;
+
+                void trackSimpleEvent({
+                    interaction_type: commandType,
+                    element_id: 'thumb_command',
+                    session_name: playerSessionName,
+                    page_url: window.location.href,
+                    timestamp: Date.now(),
+                    command_type: commandType,
+                    context: {
+                        song_id: songId,
+                        old_bpm: Number.isFinite(oldBpm) ? Number(oldBpm.toFixed(3)) : null,
+                        new_bpm: Number.isFinite(newBpm) ? Number(newBpm.toFixed(3)) : null,
+                    },
+                });
+            }
+
+            previousThumbDeltaRef.current = nextThumbDelta;
+            previousBpmShiftPercentRef.current = Number(recommendation?.bpmShiftPercent) || 0;
+            setCurrentRecommendation(recommendation);
             applyRecommendationToConsole(output);
         },
-        [applyRecommendationToConsole],
+        [applyRecommendationToConsole, playerSessionName, resolveActiveSongId, resolveActiveTrackBaseBpm],
     );
 
     const noddingAmplitudeForDeckUi = Number(currentRecommendation?.noddingAmplitude) || 0;
-    // Set demo session mode
-    useEffect(() => {
-        if (isDemoTrack) {
-            setIsDemoSession(true);
-        } else {
-            const storedToken = localStorage.getItem('idToken');
-            setIsDemoSession(!storedToken);
-        }
-    }, [isDemoTrack]);
 
+    const { startPlaybackSession, endPlaybackSession } = usePlaybackSessionAnalytics({
+        pageName,
+        sessionName: playerSessionName,
+        resolveTrackName: resolveActiveTrackName,
+    });
     // Initialize camera stream on mount so detection is always available
     useEffect(() => {
         let mediaStream = null;
@@ -341,232 +421,52 @@ const Player = ({
     }, []);
 
 
-    // Handle play/pause
-    const handlePlayPause = async () => {
-        if (!audioRef.current) {
-            // Audio ref is null
-            setError('Audio element not found');
-            return;
-        }
-
-        if (!hasValidAudioSource()) {
-            // No audio source selected/loaded
-            setError('Please select an audio track first');
-            return;
-        }
-
-        try {
-            // Initialize audio context with user interaction
-            if (audioRef.current && audioRef.current.soundConsoleMethods) {
-                const success = await audioRef.current.soundConsoleMethods.initializeAudioContext();
-                if (!success) {
-                    setError('Audio processing not supported in this browser');
-                    return;
-                }
-                
-                const audioContext = audioRef.current.audioContextRef?.current;
-                if (audioContext && audioContext.state === 'suspended') {
-                    // Resume suspended audio context (required for secure contexts)
-                    try {
-                        await audioContext.resume();
-                    } catch (resumeError) {
-                        // Continue anyway, might still work
-                    }
-                }
-                
-                // Ensure all effects are created after audio context is active
-                if (audioRef.current.soundConsoleMethods.forceAllEffectsCreation) {
-                    setTimeout(() => {
-                        audioRef.current.soundConsoleMethods.forceAllEffectsCreation();
-                    }, 200);
-                }
-            }
-            
-            if (isPlaying) {
-                audioRef.current.pause();
-                setIsPlaying(false);
-                if (onMusicPause) onMusicPause();
-            } else {
-                await audioRef.current.play();
-                setIsPlaying(true);
-                if (onMusicPlay) onMusicPlay();
-                if (autoStartLandmarkWithMusic) {
-                    setLandmarkAutoStartTick((t) => t + 1);
-                }
-            }
-            
-        } catch (error) {
-            const me = audioRef.current?.error;
-            const code = me?.code;
-            const MEDIA_ERR_SRC_NOT_SUPPORTED = 4;
-            const msg = error?.message || String(error);
-            const notSuitable =
-                code === MEDIA_ERR_SRC_NOT_SUPPORTED ||
-                /not suitable/i.test(msg);
-            const corsHint = notSuitable
-                ? ' Often caused by 403/404, wrong Content-Type, or missing CORS on the CDN (GET responses need Access-Control-Allow-Origin for Web Audio with crossOrigin).'
-                : '';
-            setError(`Failed to play audio: ${msg}.${corsHint}`);
-        }
-    };
-
-    // Handle stop
-    const handleStop = () => {
-        if (audioRef.current) {
-            audioRef.current.pause();
-            audioRef.current.currentTime = 0;
-            setIsPlaying(false);
-            setCurrentTime(0);
-            if (onMusicPause) onMusicPause();
+    const deckATransport = useDeckTransport({
+        audioRef,
+        hasValidAudioSource,
+        setError,
+        missingElementMessage: 'Audio element not found',
+        missingSourceMessage: 'Please select an audio track first',
+        unsupportedProcessingMessage: 'Audio processing not supported in this browser',
+        playbackFailedPrefix: 'Failed to play audio: ',
+        mediaLoadErrorMessage: 'Error loading audio file. Please try another file.',
+        onPlay: () => {
+            startPlaybackSession();
+            onMusicPlay?.();
+        },
+        onPause: () => {
+            onMusicPause?.();
+        },
+        onStop: () => {
+            void endPlaybackSession('stop_button');
             if (stream) {
                 setDetectionForceStopTick((t) => t + 1);
             }
-        }
-    };
-
-    // Handle next track
-    const handleNext = () => {
-        if (playlist.length > 0 && currentTrackIndex >= 0) {
-            const nextIndex = currentTrackIndex + 1;
-            if (nextIndex < playlist.length) {
-                onTrackSelect(playlist[nextIndex], nextIndex, isPlaying);
-            }
-        }
-    };
-
-    // Handle previous track
-    const handlePrevious = () => {
-        if (playlist.length > 0 && currentTrackIndex >= 0) {
-            const prevIndex = currentTrackIndex - 1;
-            if (prevIndex >= 0) {
-                onTrackSelect(playlist[prevIndex], prevIndex, isPlaying);
-            }
-        }
-    };
-
-    // Audio event handlers
-    useEffect(() => {
-        const audio = audioRef.current;
-        if (!audio) return;
-
-        const handleLoadedMetadata = () => {
-            setDuration(audio.duration);
-        };
-
-        const handleTimeUpdate = () => {
-            setCurrentTime(audio.currentTime);
-        };
-
-        const handleEnded = () => {
-            setIsPlaying(false);
-            setCurrentTime(0);
-            if (onMusicPause) onMusicPause();
-            
-            // Auto-play next track if in playlist mode
-            if (playlist.length > 0 && currentTrackIndex >= 0) {
-                const nextIndex = currentTrackIndex + 1;
-                if (nextIndex < playlist.length) {
-                    setTimeout(() => {
-                        onTrackSelect(playlist[nextIndex], nextIndex, true);
-                    }, 500);
-                }
-            }
-        };
-
-        const handleError = () => {
-            setError('Error loading audio file. Please try another file.');
-            setIsPlaying(false);
-        };
-
-        audio.addEventListener('loadedmetadata', handleLoadedMetadata);
-        audio.addEventListener('timeupdate', handleTimeUpdate);
-        audio.addEventListener('ended', handleEnded);
-        audio.addEventListener('error', handleError);
-
-        return () => {
-            audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
-            audio.removeEventListener('timeupdate', handleTimeUpdate);
-            audio.removeEventListener('ended', handleEnded);
-            audio.removeEventListener('error', handleError);
-        };
-    }, [selectedFile, playlist, currentTrackIndex, onTrackSelect]);
-
-    const handleProgressSeek = useCallback((fraction) => {
-        const audio = audioRef.current;
-        if (!audio) return;
-        const dur = resolveMediaDuration(audio, duration);
-        if (!dur) return;
-        const newTime = Math.min(1, Math.max(0, fraction)) * dur;
-        audio.currentTime = newTime;
-        setCurrentTime(newTime);
-    }, [duration]);
-
-    const handlePlayPauseDeckB = async () => {
-        if (!deckBAudioRef.current) {
-            setError('Second track audio element not found');
-            return;
-        }
-
-        if (!hasValidAudioSourceDeckB()) {
-            setError('Please load a track into the second player first');
-            return;
-        }
-
-        try {
-            if (deckBAudioRef.current.soundConsoleMethods) {
-                const success = await deckBAudioRef.current.soundConsoleMethods.initializeAudioContext();
-                if (!success) {
-                    setError('Second track: audio processing not supported in this browser');
-                    return;
-                }
-                const audioContext = deckBAudioRef.current.audioContextRef?.current;
-                if (audioContext && audioContext.state === 'suspended') {
-                    try {
-                        await audioContext.resume();
-                    } catch (resumeError) {
-                        // continue
-                    }
-                }
-                if (deckBAudioRef.current.soundConsoleMethods.forceAllEffectsCreation) {
-                    setTimeout(() => {
-                        deckBAudioRef.current.soundConsoleMethods.forceAllEffectsCreation();
-                    }, 200);
-                }
-            }
-
-            if (isPlayingDeckB) {
-                deckBAudioRef.current.pause();
-                setIsPlayingDeckB(false);
-            } else {
-                await deckBAudioRef.current.play();
-                setIsPlayingDeckB(true);
-                if (autoStartLandmarkWithMusic) {
-                    setLandmarkAutoStartTick((t) => t + 1);
-                }
-            }
-        } catch (playbackError) {
-            setError(`Second track playback failed: ${playbackError.message}`);
-        }
-    };
-
-    const handleStopDeckB = () => {
-        if (deckBAudioRef.current) {
-            deckBAudioRef.current.pause();
-            deckBAudioRef.current.currentTime = 0;
-            setIsPlayingDeckB(false);
-            setCurrentTimeDeckB(0);
-        }
-    };
-
-    const handleProgressSeekDeckB = useCallback((fraction) => {
-        const audio = deckBAudioRef.current;
-        if (!audio) return;
-        const dur = resolveMediaDuration(audio, durationDeckB);
-        if (!dur) return;
-        const newTime = Math.min(1, Math.max(0, fraction)) * dur;
-        audio.currentTime = newTime;
-        setCurrentTimeDeckB(newTime);
-    }, [durationDeckB]);
+        },
+        onTrackEndedNoAutoNext: () => {
+            void endPlaybackSession('track_ended');
+        },
+        autoStartLandmarkWithMusic,
+        setLandmarkAutoStartTick,
+        selectedFile,
+        playlist,
+        currentTrackIndex,
+        onTrackSelect,
+        isTrackSwitchingRef,
+    });
+    const deckBTransport = useDeckTransport({
+        audioRef: deckBAudioRef,
+        hasValidAudioSource: hasValidAudioSourceDeckB,
+        setError,
+        missingElementMessage: 'Second track audio element not found',
+        missingSourceMessage: 'Please load a track into the second player first',
+        unsupportedProcessingMessage: 'Second track: audio processing not supported in this browser',
+        playbackFailedPrefix: 'Second track playback failed: ',
+        mediaLoadErrorMessage: 'Error loading second track audio',
+        autoStartLandmarkWithMusic,
+        setLandmarkAutoStartTick,
+        selectedFile: loadedDeckBTrack,
+    });
 
     // Handle dropping/loading a track into deck A or B
     const handleLoadTrackToDeck = useCallback(async (deckId, track) => {
@@ -630,42 +530,6 @@ const Player = ({
         }
     }, [onTrackSelect, playlist, currentTrackIndex, onLoadDeckBTrack, deckBAudioRef]);
 
-    // Deck B audio event handlers
-    useEffect(() => {
-        const audio = deckBAudioRef.current;
-        if (!audio) return;
-
-        const handleLoadedMetadata = () => {
-            setDurationDeckB(audio.duration || 0);
-        };
-
-        const handleTimeUpdate = () => {
-            setCurrentTimeDeckB(audio.currentTime || 0);
-        };
-
-        const handleEnded = () => {
-            setIsPlayingDeckB(false);
-            setCurrentTimeDeckB(0);
-        };
-
-        const handleErrorDeckB = () => {
-            setError('Error loading second track audio');
-            setIsPlayingDeckB(false);
-        };
-
-        audio.addEventListener('loadedmetadata', handleLoadedMetadata);
-        audio.addEventListener('timeupdate', handleTimeUpdate);
-        audio.addEventListener('ended', handleEnded);
-        audio.addEventListener('error', handleErrorDeckB);
-
-        return () => {
-            audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
-            audio.removeEventListener('timeupdate', handleTimeUpdate);
-            audio.removeEventListener('ended', handleEnded);
-            audio.removeEventListener('error', handleErrorDeckB);
-        };
-    }, [deckBAudioRef]);
-
     const deck1ArtworkUrl =
         resolveDeckArtworkUrl(loadedDeckATrack) ||
         resolveDeckArtworkUrl(selectedFile) ||
@@ -677,23 +541,10 @@ const Player = ({
 
     return (
         <Container fluid className="mt-4 px-3">
-            {/* Tutorial Message */}
-            {isTutorialMode && !playerTutorialDismissed && (
-                <TutorialMessage 
-                    messages={[
-                        "Welcome to the Soundbloom player! Use your webcam for face, body pose, and hand signals together, then shape the audio in real time.",
-                        "Start music, allow the camera, and use the sensing controls to begin detection.",
-                        "You can customize audio mappings to create your own personal audio experience."
-                    ]}
-                    position="top-center"
-                    onClose={() => setPlayerTutorialDismissed(true)}
-                />
-            )}
-
             <div className="bg-dark rounded p-4" style={{ backgroundColor: '#1a1a1a' }}>
                 {/* Playback controls, detection, and sound console — above library / track UI */}
                 <div className="d-flex flex-column mb-4" style={{ width: '100%', overflow: 'visible' }}>
-                    {!isDemoTrack && (
+                    {enableSecondDeck && (
                         <div className="d-flex justify-content-end mb-2 flex-wrap gap-2">
                             {!secondDeckActive && (
                                 <Button
@@ -713,7 +564,7 @@ const Player = ({
                                     type="button"
                                     onClick={() => {
                                         setSecondDeckActive(false);
-                                        handleStopDeckB();
+                                        deckBTransport.handleStop();
                                     }}
                                     style={{ fontSize: '0.8rem' }}
                                 >
@@ -743,32 +594,35 @@ const Player = ({
                             >
                                 <DeckControls
                                     deckId="A"
+                                    currentSongId={resolveActiveSongId()}
                                     onLoadTrack={handleLoadTrackToDeck}
                                     loadedTrackName={loadedDeckATrack?.displayName || selectedFile?.name || ''}
-                                    isPlaying={isPlaying}
-                                    currentTime={currentTime}
-                                    duration={duration}
+                                    isPlaying={deckATransport.isPlaying}
+                                    currentTime={deckATransport.currentTime}
+                                    duration={deckATransport.duration}
                                     hasValidAudioSource={hasValidAudioSource}
-                                    onPlayPause={handlePlayPause}
-                                    onStop={handleStop}
-                                    onPrevious={handlePrevious}
-                                    onNext={handleNext}
-                                    onProgressSeek={handleProgressSeek}
+                                    onPlayPause={deckATransport.handlePlayPause}
+                                    onStop={deckATransport.handleStop}
+                                    onPrevious={deckATransport.handlePrevious}
+                                    onNext={deckATransport.handleNext}
+                                    onProgressSeek={deckATransport.handleProgressSeek}
                                     hasPrevious={playlist.length > 0 && currentTrackIndex > 0}
                                     hasNext={playlist.length > 0 && currentTrackIndex < playlist.length - 1}
                                     iconSize={secondDeckActive ? '1.68rem' : '2.1rem'}
-                                    showPreviousNext={playlist.length > 0}
+                                    showPreviousNext={enableTrackNavigation}
+                                    showStopButton={enableStopButton}
                                     showAudioDevice={!secondDeckActive}
                                     showSoundConsole={!secondDeckActive}
-                                    showTutorial={!secondDeckActive}
+                                    showTutorial={showTutorialButton && !secondDeckActive}
                                     onAudioDeviceClick={
                                         secondDeckActive ? undefined : () => setShowAudioModal(true)
                                     }
                                     onSoundConsoleClick={
                                         secondDeckActive ? undefined : () => setDeckASoundConsoleOpen(true)
                                     }
-                                    tutorialDismissed={playerTutorialDismissed}
-                                    setTutorialDismissed={setPlayerTutorialDismissed}
+                                    tutorialDismissed={true}
+                                    setTutorialDismissed={() => {}}
+                                    onTutorialClick={onTutorialButtonClick}
                                     artworkUrl={deck1ArtworkUrl}
                                     artworkSizePx={deck1ArtworkSizePx}
                                     trackStatusMessage={deckATrackStatusMessage}
@@ -796,19 +650,21 @@ const Player = ({
                                 >
                                     <DeckControls
                                         deckId="B"
+                                        currentSongId={null}
                                         onLoadTrack={handleLoadTrackToDeck}
                                         loadedTrackName={loadedDeckBTrack?.displayName || ''}
-                                        isPlaying={isPlayingDeckB}
-                                        currentTime={currentTimeDeckB}
-                                        duration={durationDeckB}
+                                    isPlaying={deckBTransport.isPlaying}
+                                    currentTime={deckBTransport.currentTime}
+                                    duration={deckBTransport.duration}
                                         hasValidAudioSource={hasValidAudioSourceDeckB}
-                                        onPlayPause={handlePlayPauseDeckB}
-                                        onStop={handleStopDeckB}
-                                        onProgressSeek={handleProgressSeekDeckB}
+                                    onPlayPause={deckBTransport.handlePlayPause}
+                                    onStop={deckBTransport.handleStop}
+                                    onProgressSeek={deckBTransport.handleProgressSeek}
                                         hasPrevious={false}
                                         hasNext={false}
                                         iconSize="1.68rem"
                                         showPreviousNext={false}
+                                        showStopButton={enableStopButton}
                                         artworkUrl={deck2ArtworkUrl}
                                         artworkSizePx={deck2ArtworkSizePx}
                                     />
@@ -835,13 +691,6 @@ const Player = ({
                                 showTooltip={true}
                                 tooltipText="Sound console"
                             />
-                            <TutorialButton
-                                tutorialDismissed={playerTutorialDismissed}
-                                setTutorialDismissed={setPlayerTutorialDismissed}
-                                size="1.82rem"
-                                showTooltip={true}
-                                tooltipText="Tutorial"
-                            />
                         </div>
                     )}
 
@@ -851,7 +700,6 @@ const Player = ({
                             <AdaptationOrchestrator
                                 policyBundleRef={reactionPolicyBundleRef}
                                 stream={stream}
-                                isDemoSession={is_demo_session}
                                 sensingSessionName={`${pageName}_session`}
                                 sensingSizeMode="large"
                                 autoStartLandmarkTick={autoStartLandmarkWithMusic ? landmarkAutoStartTick : 0}
@@ -881,30 +729,35 @@ const Player = ({
                     crossOrigin="anonymous"
                     onLoadedMetadata={() => {
                         if (audioRef.current) {
-                            setDuration(audioRef.current.duration);
+                            deckATransport.setDuration(audioRef.current.duration);
                         }
                     }}
                     onTimeUpdate={() => {
                         if (audioRef.current) {
-                            setCurrentTime(audioRef.current.currentTime);
+                            deckATransport.setCurrentTime(audioRef.current.currentTime);
                         }
                     }}
                     onEnded={() => {
-                        setIsPlaying(false);
-                        setCurrentTime(0);
+                        deckATransport.setIsPlaying(false);
+                        deckATransport.setCurrentTime(0);
                     }}
                     onPlay={() => {
-                        setIsPlaying(true);
+                        isTrackSwitchingRef.current = false;
+                        startPlaybackSession();
+                        deckATransport.setIsPlaying(true);
                         if (onMusicPlay) onMusicPlay();
                     }}
                     onPause={() => {
-                        setIsPlaying(false);
+                        if (!isTrackSwitchingRef.current) {
+                            void endPlaybackSession('pause');
+                        }
+                        deckATransport.setIsPlaying(false);
                         if (onMusicPause) onMusicPause();
                     }}
                     onError={(e) => {
                         // Audio error
                         setError('Error loading audio file');
-                        setIsPlaying(false);
+                        deckATransport.setIsPlaying(false);
                     }}
                 />
 
@@ -915,35 +768,35 @@ const Player = ({
                     crossOrigin="anonymous"
                     onLoadedMetadata={() => {
                         if (deckBAudioRef.current) {
-                            setDurationDeckB(deckBAudioRef.current.duration || 0);
+                            deckBTransport.setDuration(deckBAudioRef.current.duration || 0);
                         }
                     }}
                     onDurationChange={() => {
                         if (deckBAudioRef.current) {
                             const d = deckBAudioRef.current.duration;
                             if (Number.isFinite(d) && d > 0) {
-                                setDurationDeckB(d);
+                                deckBTransport.setDuration(d);
                             }
                         }
                     }}
                     onTimeUpdate={() => {
                         if (deckBAudioRef.current) {
-                            setCurrentTimeDeckB(deckBAudioRef.current.currentTime || 0);
+                            deckBTransport.setCurrentTime(deckBAudioRef.current.currentTime || 0);
                         }
                     }}
                     onEnded={() => {
-                        setIsPlayingDeckB(false);
-                        setCurrentTimeDeckB(0);
+                        deckBTransport.setIsPlaying(false);
+                        deckBTransport.setCurrentTime(0);
                     }}
                     onPlay={() => {
-                        setIsPlayingDeckB(true);
+                        deckBTransport.setIsPlaying(true);
                     }}
                     onPause={() => {
-                        setIsPlayingDeckB(false);
+                        deckBTransport.setIsPlaying(false);
                     }}
                     onError={() => {
                         setError('Error loading second track audio file');
-                        setIsPlayingDeckB(false);
+                        deckBTransport.setIsPlaying(false);
                     }}
                 />
             </div>

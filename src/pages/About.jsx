@@ -27,6 +27,9 @@ const About = () => {
                             <li>Session creation and attendance management</li>
                             <li>Real-time analytics and emotion tracking</li>
                         </ul>
+                        <p className="mb-4">
+                            The local folder player supports common audio formats: .mp3, .wav, .flac, .m4a, .aac, .ogg, .wma, .aiff, and .au.
+                        </p>
 
                         <h2 className="mb-3">Technology Stack</h2>
                         <p>TuneTribes is built using modern web technologies:</p>

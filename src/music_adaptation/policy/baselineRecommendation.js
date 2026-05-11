@@ -2,7 +2,7 @@
  * Build the SoundConsole recommendation row from one playback profile + user mapping tables.
  */
 
-import { resolveEqVector, EQ_PRESETS } from './eqPresetVectors.v1';
+import { resolveEqVector, EQ_PRESETS } from './fixed_mappings/eqPresetVectors.v1';
 import {
     resolveVolumeMultiplierForPlaybackProfile,
     resolveKeyShiftForPlaybackProfile,
@@ -10,8 +10,8 @@ import {
     DEFAULT_REVERB_MAPPINGS,
     DEFAULT_DELAY_MAPPINGS,
     DEFAULT_BPM_SHIFT_MAPPINGS,
-} from './reactionMappingDefaults.v1';
-import { playbackProfileUsesNoddingVolume } from './reactionPlaybackProfiles.v1';
+} from './fixed_mappings/reactionMappingDefaults.v1';
+import { playbackProfileUsesNoddingVolume } from './fixed_mappings/reactionPlaybackProfiles.v1';
 
 /**
  * @param {{
@@ -69,8 +69,7 @@ export function buildBaselineRecommendation(args) {
         typeof nodBpmShiftPercentOverride === 'number' && Number.isFinite(nodBpmShiftPercentOverride)
             ? nodBpmShiftPercentOverride
             : mappedBpmShift;
-    // Product rule: head nodding must not alter song tempo.
-    const bpmShiftPercent = isNodding ? 0 : bpmShiftPercentRaw;
+    const bpmShiftPercent = bpmShiftPercentRaw;
 
     const eqPresetKeyword = Array.isArray(eqMapping)
         ? Object.keys(EQ_PRESETS).find((key) => JSON.stringify(EQ_PRESETS[key]) === JSON.stringify(eqVector)) ||
@@ -101,6 +100,7 @@ export function buildBaselineRecommendation(args) {
         delayAmount,
         keyShiftSemitones,
         bpmShiftPercent,
+        bpmKeyShiftPercent: 0,
         meanNodFrequencyHz:
             typeof meanNodFrequencyHz === 'number' && Number.isFinite(meanNodFrequencyHz)
                 ? meanNodFrequencyHz

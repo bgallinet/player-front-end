@@ -10,6 +10,7 @@ import { reactionOutputsDiffer } from '../music_adaptation/policy/reactionOutput
  *   policyBundleRef: React.MutableRefObject<import('../music_adaptation/policy/reactionPolicyBundle').ReactionPolicyBundleSnapshot>,
  *   bufferRef: React.MutableRefObject<import('../music_adaptation/timeline/CueRingBuffer').CueRingBuffer|null>,
  *   prevDominantFaceToneRef: React.MutableRefObject<string|null>,
+ *   persistentThumbBpmStateRef?: React.MutableRefObject<{ persistentDeltaBpm: number, prevThumbUpActive: boolean, prevThumbDownActive: boolean }>,
  *   analysisWindowMs: number,
  *   sampleHz: number,
  *   updateIntervalMs: number,
@@ -22,18 +23,21 @@ import { reactionOutputsDiffer } from '../music_adaptation/policy/reactionOutput
  *     },
  *   ) => void,
  *   nodTrackBpmAudioRef?: React.MutableRefObject<({ detectedTrackBpm?: number | null } & HTMLMediaElement) | null>,
+ *   latestSensingFeedRef?: React.MutableRefObject<import('../music_adaptation/feeds/reactionSensingFeed').ReactionSensingFeedSnapshot>,
  * }} args
  */
 export function usePlaybackPolicy({
     policyBundleRef,
     bufferRef,
     prevDominantFaceToneRef,
+    persistentThumbBpmStateRef,
     analysisWindowMs,
     sampleHz,
     updateIntervalMs,
     onReactionOutput,
     enabled = true,
     nodTrackBpmAudioRef,
+    latestSensingFeedRef,
 }) {
     const lastOutputRef = useRef(null);
 
@@ -45,12 +49,14 @@ export function usePlaybackPolicy({
             buffer: bufferRef.current,
             policyBundle: policyBundleRef.current,
             prevDominantFaceToneRef,
+            persistentThumbBpmStateRef,
             analysisWindowMs,
             sampleHz,
             nowMs: Date.now(),
             nodTrackBpm,
+            latestSensingFeed: latestSensingFeedRef?.current,
         });
-    }, [policyBundleRef, bufferRef, prevDominantFaceToneRef, analysisWindowMs, sampleHz, nodTrackBpmAudioRef]);
+    }, [policyBundleRef, bufferRef, prevDominantFaceToneRef, persistentThumbBpmStateRef, analysisWindowMs, sampleHz, nodTrackBpmAudioRef, latestSensingFeedRef]);
 
     useEffect(() => {
         if (!enabled) return undefined;

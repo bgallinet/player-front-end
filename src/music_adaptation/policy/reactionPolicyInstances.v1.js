@@ -15,7 +15,7 @@ import {
     DEFAULT_DELAY_MAPPINGS,
     DEFAULT_KEY_SHIFT_MAPPINGS,
     DEFAULT_BPM_SHIFT_MAPPINGS,
-} from './reactionMappingDefaults.v1';
+} from './fixed_mappings/reactionMappingDefaults.v1';
 
 /**
  * @typedef {import('./reactionPolicyBundle').ReactionPolicyBundleSnapshot & {

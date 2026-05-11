@@ -3,7 +3,6 @@
  * Overlay composition: `drawHolisticOverlay` below; primitives: `BodyPoseDrawing`, `HandDrawing`, `LandmarkDrawing`; math: `music_adaptation/landmarks/*`.
  */
 import React, { useEffect, useState, useRef, useMemo } from 'react';
-import AnalyticsAPI from '../../utils/AnalyticsAPI.jsx';
 import {
     scanFrequencyLandmark,
     scanFrequencyPose,
@@ -11,7 +10,7 @@ import {
     secondaryColor,
     thresholdForVisualizationOfNodding,
 } from '../../utils/DisplaySettings.jsx';
-import { getSessionNameFromUrl, createAuthenticatedRequestBody } from '../../hooks/sessionUtils.js';
+import { getSessionNameFromUrl } from '../../hooks/sessionUtils.js';
 import { HolisticLandmarker, GestureRecognizer, FilesetResolver } from '@mediapipe/tasks-vision';
 import BodyPoseDrawing from './BodyPoseDrawing';
 import HandDrawing from './HandDrawing';
@@ -36,6 +35,7 @@ import {
 } from '../../music_adaptation/landmarks/holisticFrameUtils';
 import PlayPauseButton from '../../buttons/PlayPauseButton';
 import CloseButton from '../../buttons/CloseButton';
+import { trackButtonClick } from '../../hooks/simpleTracker';
 
 /**
  * @param {{
@@ -111,12 +111,23 @@ function drawHolisticOverlay(p) {
 
 const isProduction = process.env.NODE_ENV === 'production';
 
+function readStoredEnergyValue(key) {
+    try {
+        const raw = localStorage.getItem(key);
+        if (raw === null || raw === undefined || raw === '') return null;
+        const parsed = Number(raw);
+        return Number.isFinite(parsed) ? parsed : null;
+    } catch {
+        return null;
+    }
+}
+
 const UnifiedSensingUserUI = ({
     stream,
     embeddingTW,
-    is_demo_session,
     sessionName,
     sizeMode = 'large',
+    showDetectionToggle = false,
     autoStartLandmarkTick = 0,
     forceStopDetectionTick = 0,
     onSensingFeedFrame,
@@ -167,6 +178,15 @@ const UnifiedSensingUserUI = ({
         }
         return sizeMode === 'large' ? '160px' : '80px';
     }, [isOverlayLayout, sizeMode]);
+
+    // User-state survey values are currently static during the session (non-dynamic modality).
+    const energyModalitySnapshot = useMemo(
+        () => ({
+            currentEnergy: readStoredEnergyValue('current_energy'),
+            targetEnergy: readStoredEnergyValue('target_energy'),
+        }),
+        []
+    );
 
     useEffect(() => {
         if (!scan) {
@@ -436,7 +456,13 @@ const UnifiedSensingUserUI = ({
                     handsRaised: latestLeftHandRaised.current || latestRightHandRaised.current,
                     thumbDownActive,
                     thumbUpActive,
+                    currentEnergy: energyModalitySnapshot.currentEnergy,
+                    targetEnergy: energyModalitySnapshot.targetEnergy,
                     modalitiesDetail: {
+                        userStateSurvey: {
+                            currentEnergy: energyModalitySnapshot.currentEnergy,
+                            targetEnergy: energyModalitySnapshot.targetEnergy,
+                        },
                         nodding: {
                             amplitude: latestNoddingAmplitude.current,
                             frequency: latestNoddingFrequency.current,
@@ -492,36 +518,26 @@ const UnifiedSensingUserUI = ({
         }
     };
 
-    const handleToggle = async () => {
+    const handleToggle = async ({ trackInteraction = false } = {}) => {
         const wasScanning = scan;
+
+        if (trackInteraction) {
+            void trackButtonClick(
+                wasScanning ? 'stop_detection_button_press' : 'start_detection_button_press',
+                window.location.href,
+                {
+                    session_name: sessionName || getSessionNameFromUrl(),
+                    intended_action: wasScanning ? 'stop_detection' : 'start_detection',
+                    detector_ready: Boolean(isModelLoaded && detectorInitialized && !modelError)
+                }
+            );
+        }
+
         if (!wasScanning) {
             setFaceVisible('false');
         }
         setScan(!wasScanning);
 
-        try {
-            const analyticsData = JSON.stringify(
-                createAuthenticatedRequestBody(
-                    {
-                        request_type: 'analytics',
-                        interaction_type: 'user_interaction',
-                        element_id: scan ? 'stop_unified_sensing' : 'start_unified_sensing',
-                        page_url: window.location.href,
-                        session_name: sessionName || getSessionNameFromUrl(),
-                        experiment_name: 'unified_holistic_detection_ui',
-                        metadata: { variant: 'control', is_control: true, experiment_config: {} },
-                    },
-                    is_demo_session,
-                ),
-            );
-            AnalyticsAPI(analyticsData, !is_demo_session);
-        } catch {
-            /* ignore */
-        }
-
-        if (!is_demo_session && !localStorage.getItem('idToken')) {
-            return;
-        }
         if (!isModelLoaded || !holisticRef.current || !detectorInitialized) {
             return;
         }
@@ -548,6 +564,18 @@ const UnifiedSensingUserUI = ({
         }, unifiedScanMs);
     };
 
+    const handleRestoreOverlay = () => {
+        void trackButtonClick(
+            'restore_detection_overlay_button_press',
+            window.location.href,
+            {
+                session_name: sessionName || getSessionNameFromUrl(),
+                intended_action: 'restore_detection_overlay',
+            }
+        );
+        setOverlayDismissed(false);
+    };
+
     const lastAutoTick = useRef(0);
     useEffect(() => {
         if (!autoStartLandmarkTick || autoStartLandmarkTick <= lastAutoTick.current) return;
@@ -557,7 +585,7 @@ const UnifiedSensingUserUI = ({
         }
         if (!isModelLoaded || !holisticRef.current || !detectorInitialized || modelError) return;
         lastAutoTick.current = autoStartLandmarkTick;
-        void handleToggle();
+        void handleToggle({ trackInteraction: false });
         // eslint-disable-next-line react-hooks/exhaustive-deps -- tick-driven start
     }, [autoStartLandmarkTick, scan, isModelLoaded, detectorInitialized, modelError]);
 
@@ -566,7 +594,7 @@ const UnifiedSensingUserUI = ({
         if (!forceStopDetectionTick || forceStopDetectionTick <= lastStopTick.current) return;
         lastStopTick.current = forceStopDetectionTick;
         if (!scan) return;
-        void handleToggle();
+        void handleToggle({ trackInteraction: false });
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [forceStopDetectionTick, scan]);
 
@@ -661,6 +689,39 @@ const UnifiedSensingUserUI = ({
                     />
                 </div>
             )}
+            {scan && overlayDismissed && (
+                <div
+                    style={{
+                        position: 'absolute',
+                        top: '0.75rem',
+                        right: '0.75rem',
+                        zIndex: 10,
+                    }}
+                >
+                    <button
+                        type="button"
+                        onClick={handleRestoreOverlay}
+                        aria-label="Restore sensing overlay fullscreen view"
+                        title="Fullscreen sensing overlay"
+                        style={{
+                            width: '2.4rem',
+                            height: '2.4rem',
+                            borderRadius: '999px',
+                            border: '1px solid rgba(255,255,255,0.6)',
+                            background: 'rgba(0,0,0,0.6)',
+                            color: '#fff',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer',
+                            fontSize: '1.1rem',
+                            lineHeight: 1,
+                        }}
+                    >
+                        <span aria-hidden="true">⛶</span>
+                    </button>
+                </div>
+            )}
             <div
                 className={`${embeddingTW ? 'twitch-embed-page' : ''}`}
                 style={{
@@ -693,68 +754,67 @@ const UnifiedSensingUserUI = ({
                         maxHeight: isOverlayLayout ? '100%' : undefined,
                     }}
                 >
-                    <div className="d-flex align-items-center justify-content-center gap-2 flex-wrap">
-                        <PlayPauseButton
-                            onClick={() => void handleToggle()}
-                            isPlaying={scan}
-                            size={transportBtnSize}
-                            tooltipText={scan ? 'Stop detection' : 'Start detection'}
-                            isEnabled={
-                                isModelLoaded &&
-                                detectorInitialized &&
-                                !modelError &&
-                                (localStorage.getItem('idToken') || is_demo_session)
-                            }
-                            style={{
-                                width: transportBtnSize,
-                                height: transportBtnSize,
-                            }}
-                        />
-                        {scan && (
-                            <div
+                    {showDetectionToggle && (
+                        <div className="d-flex align-items-center justify-content-center gap-2 flex-wrap">
+                            <PlayPauseButton
+                                onClick={() => void handleToggle({ trackInteraction: true })}
+                                isPlaying={scan}
+                                size={transportBtnSize}
+                                tooltipText={scan ? 'Stop detection' : 'Start detection'}
+                                isEnabled={
+                                    isModelLoaded &&
+                                    detectorInitialized &&
+                                    !modelError
+                                }
                                 style={{
-                                    width: window.innerWidth < 768 ? '1rem' : '1.2rem',
-                                    height: window.innerWidth < 768 ? '1rem' : '1.2rem',
-                                    borderRadius: '50%',
-                                    border: '0.2rem solid white',
-                                    backgroundColor: faceVisible === 'true' ? '#4CAF50' : '#FF0000',
+                                    width: transportBtnSize,
+                                    height: transportBtnSize,
                                 }}
                             />
-                        )}
-                        {!scan ? (
-                            <p
-                                style={{
-                                    textAlign: 'left',
-                                    margin: 0,
-                                    fontSize: window.innerWidth < 768 ? '0.8rem' : '1rem',
-                                    lineHeight: '1.2',
-                                    color: 'white',
-                                }}
-                            >
-                                {modelError
-                                    ? 'Model Error'
-                                    : !isModelLoaded
-                                      ? 'Loading model...'
-                                      : !detectorInitialized
-                                        ? 'Loading video...'
-                                        : !is_demo_session && !localStorage.getItem('idToken')
-                                          ? 'Login needed'
-                                          : 'Start detection'}
-                            </p>
-                        ) : (
-                            <p
-                                style={{
-                                    textAlign: 'left',
-                                    margin: 0,
-                                    fontSize: window.innerWidth < 768 ? '0.8rem' : '1rem',
-                                    lineHeight: '1.2',
-                                    color: 'white',
-                                }}
-                            >
-                                {faceVisible === 'true' ? 'Detecting' : 'Searching...'}
-                            </p>
-                        )}
-                    </div>
+                            {scan && (
+                                <div
+                                    style={{
+                                        width: window.innerWidth < 768 ? '1rem' : '1.2rem',
+                                        height: window.innerWidth < 768 ? '1rem' : '1.2rem',
+                                        borderRadius: '50%',
+                                        border: '0.2rem solid white',
+                                        backgroundColor: faceVisible === 'true' ? '#4CAF50' : '#FF0000',
+                                    }}
+                                />
+                            )}
+                            {!scan ? (
+                                <p
+                                    style={{
+                                        textAlign: 'left',
+                                        margin: 0,
+                                        fontSize: window.innerWidth < 768 ? '0.8rem' : '1rem',
+                                        lineHeight: '1.2',
+                                        color: 'white',
+                                    }}
+                                >
+                                    {modelError
+                                        ? 'Model Error'
+                                        : !isModelLoaded
+                                          ? 'Loading model...'
+                                          : !detectorInitialized
+                                            ? 'Loading video...'
+                                            : 'Start detection'}
+                                </p>
+                            ) : (
+                                <p
+                                    style={{
+                                        textAlign: 'left',
+                                        margin: 0,
+                                        fontSize: window.innerWidth < 768 ? '0.8rem' : '1rem',
+                                        lineHeight: '1.2',
+                                        color: 'white',
+                                    }}
+                                >
+                                    {faceVisible === 'true' ? 'Detecting' : 'Searching...'}
+                                </p>
+                            )}
+                        </div>
+                    )}
                     <div className="d-flex justify-content-center" style={{ position: 'relative' }}>
                         <OrientedCamera
                             stream={stream}

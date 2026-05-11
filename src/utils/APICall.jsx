@@ -1,3 +1,4 @@
+import { enrichAnalyticsRequestBody } from './clientEnvironment';
 
 const APICall = async (requestBody, url) => {
     const idToken = localStorage.getItem('idToken');
@@ -14,10 +15,13 @@ const APICall = async (requestBody, url) => {
         };
         
         
+        const bodyToSend =
+            typeof requestBody === 'string' ? enrichAnalyticsRequestBody(requestBody) : requestBody;
+
         const response = await fetch(url, {
             method: 'POST',
             headers: headers,
-            body: requestBody
+            body: bodyToSend
         });
         
         if (!response.ok) {

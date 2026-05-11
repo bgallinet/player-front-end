@@ -12,6 +12,9 @@
  *   emotionState: string | null,
  *   dominantFaceTone: string | null,
  *   dominantEmotion: string | null,
+ *   currentEnergy?: number | null,
+ *   targetEnergy?: number | null,
+ *   energyDelta?: number | null,
  * }} ReactionRuleContext
  */
 

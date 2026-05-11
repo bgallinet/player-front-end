@@ -11,12 +11,14 @@ import StopButton from '../../buttons/StopButton';
 import PlayPauseButton from '../../buttons/PlayPauseButton';
 import PreviousButton from '../../buttons/PreviousButton';
 import NextButton from '../../buttons/NextButton';
+import { trackButtonClick } from '../../hooks/simpleTracker';
 
 const noop = () => {};
 const falseFn = () => false;
 
 export const DeckControls = ({
     deckId,
+    currentSongId = null,
     loadedTrackName = '',
     isPlaying = false,
     currentTime = 0,
@@ -33,12 +35,14 @@ export const DeckControls = ({
     onLoadTrack = noop,
     iconSize = '2.1rem',
     showPreviousNext = true,
+    showStopButton = true,
     /** Utility row below transport (audio device, sound console, tutorial) */
     showAudioDevice = false,
     showSoundConsole = false,
     showTutorial = false,
     onAudioDeviceClick,
     onSoundConsoleClick,
+    onTutorialClick,
     tutorialDismissed,
     setTutorialDismissed,
     /** Cover / artwork (URL string), e.g. SoundCloud `artwork_url` */
@@ -74,6 +78,57 @@ export const DeckControls = ({
         onFractionChange: handleProgressSeekFraction,
         enabled: canPlay
     });
+
+    const trackDeckControlClick = useCallback((controlName, extra = {}) => {
+        const elementId = `deck_${deckId}_${controlName}_button`;
+        void trackButtonClick(elementId, window.location.href, {
+            deck_id: deckId,
+            control: controlName,
+            ...extra
+        });
+    }, [deckId]);
+
+    const handlePlayPauseClick = useCallback(() => {
+        const control = isPlaying ? 'pause' : 'play';
+        const metadata = { is_playing: isPlaying };
+        if (control === 'play' && currentSongId !== null && currentSongId !== undefined) {
+            metadata.song_id = currentSongId;
+        }
+        trackDeckControlClick(control, metadata);
+        onPlayPause();
+    }, [isPlaying, onPlayPause, trackDeckControlClick, currentSongId]);
+
+    const handleStopClick = useCallback(() => {
+        trackDeckControlClick('stop', { is_playing: isPlaying });
+        onStop();
+    }, [isPlaying, onStop, trackDeckControlClick]);
+
+    const handlePreviousClick = useCallback(() => {
+        trackDeckControlClick('previous', { has_previous: hasPrevious });
+        onPrevious();
+    }, [hasPrevious, onPrevious, trackDeckControlClick]);
+
+    const handleNextClick = useCallback(() => {
+        trackDeckControlClick('next', { has_next: hasNext });
+        onNext();
+    }, [hasNext, onNext, trackDeckControlClick]);
+
+    const handleAudioDeviceClick = useCallback(() => {
+        trackDeckControlClick('audio_settings');
+        onAudioDeviceClick?.();
+    }, [onAudioDeviceClick, trackDeckControlClick]);
+
+    const handleSoundConsoleClick = useCallback(() => {
+        trackDeckControlClick('sound_console');
+        onSoundConsoleClick?.();
+    }, [onSoundConsoleClick, trackDeckControlClick]);
+
+    const handleTutorialClick = useCallback(() => {
+        trackDeckControlClick('tutorial', {
+            tutorial_visible: !tutorialDismissed
+        });
+        onTutorialClick?.();
+    }, [trackDeckControlClick, tutorialDismissed, onTutorialClick]);
 
     const formatTime = (time) => {
         if (isNaN(time)) return '0:00';
@@ -126,7 +181,7 @@ export const DeckControls = ({
     const showUtilityRow =
         (showAudioDevice && onAudioDeviceClick) ||
         (showSoundConsole && onSoundConsoleClick) ||
-        (showTutorial && setTutorialDismissed);
+        (showTutorial && (setTutorialDismissed || onTutorialClick));
 
     return (
         <div
@@ -201,7 +256,7 @@ export const DeckControls = ({
                 >
                     {showPreviousNext && (
                         <PreviousButton
-                            onClick={onPrevious}
+                            onClick={handlePreviousClick}
                             size={iconSize}
                             showTooltip={true}
                             tooltipText="Previous"
@@ -209,22 +264,24 @@ export const DeckControls = ({
                         />
                     )}
                     <PlayPauseButton
-                        onClick={onPlayPause}
+                        onClick={handlePlayPauseClick}
                         isPlaying={isPlaying}
                         size={iconSize}
                         showTooltip={true}
                         isEnabled={canPlay}
                     />
-                    <StopButton
-                        onClick={onStop}
-                        size={iconSize}
-                        showTooltip={true}
-                        tooltipText="Stop"
-                        isEnabled={canPlay}
-                    />
+                    {showStopButton && (
+                        <StopButton
+                            onClick={handleStopClick}
+                            size={iconSize}
+                            showTooltip={true}
+                            tooltipText="Stop"
+                            isEnabled={canPlay}
+                        />
+                    )}
                     {showPreviousNext && (
                         <NextButton
-                            onClick={onNext}
+                            onClick={handleNextClick}
                             size={iconSize}
                             showTooltip={true}
                             tooltipText="Next"
@@ -240,7 +297,7 @@ export const DeckControls = ({
                     >
                         {showAudioDevice && onAudioDeviceClick && (
                             <AudioDeviceButton
-                                onClick={onAudioDeviceClick}
+                                onClick={handleAudioDeviceClick}
                                 size={iconSize}
                                 showTooltip={true}
                                 tooltipText="Audio Device Settings"
@@ -249,16 +306,17 @@ export const DeckControls = ({
                     {showSoundConsole && onSoundConsoleClick && (
                         <SettingsButton
                             showSettings={false}
-                            onToggleSettings={onSoundConsoleClick}
+                            onToggleSettings={handleSoundConsoleClick}
                             size={iconSize}
                             showTooltip={true}
                             tooltipText="Sound console"
                         />
                     )}
-                        {showTutorial && setTutorialDismissed && (
+                        {showTutorial && (setTutorialDismissed || onTutorialClick) && (
                             <TutorialButton
                                 tutorialDismissed={tutorialDismissed}
                                 setTutorialDismissed={setTutorialDismissed}
+                                onClick={handleTutorialClick}
                                 size={iconSize}
                                 showTooltip={true}
                                 tooltipText="Tutorial"

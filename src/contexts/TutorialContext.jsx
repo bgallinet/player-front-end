@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState } from 'react';
 
 const TutorialContext = createContext();
 
@@ -11,27 +11,16 @@ export const useTutorial = () => {
 };
 
 export const TutorialProvider = ({ children }) => {
-    const [isTutorialMode, setIsTutorialMode] = useState(() => {
-        // Initialize from localStorage
-        const saved = localStorage.getItem('tutorialMode');
-        return saved ? JSON.parse(saved) : false;
-    });
+    const [isTutorialMode, setIsTutorialMode] = useState(false);
 
     const toggleTutorialMode = () => {
         const newMode = !isTutorialMode;
         setIsTutorialMode(newMode);
-        localStorage.setItem('tutorialMode', JSON.stringify(newMode));
     };
 
     const disableTutorialMode = () => {
         setIsTutorialMode(false);
-        localStorage.setItem('tutorialMode', JSON.stringify(false));
     };
-
-    // Save to localStorage whenever tutorial mode changes
-    useEffect(() => {
-        localStorage.setItem('tutorialMode', JSON.stringify(isTutorialMode));
-    }, [isTutorialMode]);
 
     const value = {
         isTutorialMode,

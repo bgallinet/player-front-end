@@ -2,145 +2,164 @@ import React from 'react';
 
 /**
  * TermsOfUseAnnex - Shared Terms of Use Content Component
- * 
- * This component contains the core terms of use content that can be shared
- * between the full Terms of Use page and the SignUp overlay.
+ *
+ * Describes TuneTribes as adaptive music software (not a streaming service).
  */
 const TermsOfUseAnnex = () => {
     return (
         <>
             <h2 className="mb-3">1. Acceptance of Terms</h2>
-            <p>By creating an account, accessing, or using TuneTribes, you acknowledge that you have read, understood, and agree to be bound by these Terms of Use and our Privacy Notice. If you do not agree to these terms, please do not use our service.</p>
+            <p>
+                By creating an account, accessing, or using TuneTribes, you acknowledge that you have read,
+                understood, and agree to be bound by these Terms of Use and our Privacy Notice. If you do not
+                agree to these terms, please do not use our service.
+            </p>
 
             <h2 className="mb-3">2. Service Description</h2>
-            <p>TuneTribes is a real-time music streaming platform that enables:</p>
+            <p>
+                TuneTribes is <strong>not</strong> a music streaming service, download store, or radio platform.
+                We do not supply a catalog of music for on-demand streaming as your primary source of
+                recordings. Instead, TuneTribes provides software that <strong>layers over music you already
+                play</strong> through permitted sources (for example local files or linked third-party services
+                where available) and <strong>adapts</strong> how that music is experienced in real time—for
+                example tempo, energy, or playback behaviour—using inputs from your device.
+            </p>
+            <p>Depending on the version or test session you use, the application may:</p>
             <ul>
-                <li>Music creators to stream content and engage with their audience</li>
-                <li>Music fans to join live sessions and interact with creators</li>
-                <li>Real-time emotion detection and facial expression analysis</li>
-                <li>Audience engagement through points, song requests, and leaderboards</li>
-                <li>Live camera feeds and facial landmark tracking</li>
+                <li>
+                    Use sensors on your smartphone, tablet, or wearable (and optional camera, where you allow
+                    it) to interpret reactions, movement, or context—not to replace a professional medical or
+                    biometric identity system
+                </li>
+                <li>
+                    Adjust or reshape playback in real time so the soundtrack fits your moment, in line with
+                    our goal: the right music for how you feel and move
+                </li>
+                <li>
+                    Process signals on the device or through our services to drive that adaptation, as
+                    described in our Privacy Notice (including that we do not build a facial profile or store
+                    raw biometric templates for identity purposes)
+                </li>
             </ul>
+            <p>
+                Features, experiments, and integrations may change between releases; availability of a given
+                mode or integration is not guaranteed.
+            </p>
 
             <h2 className="mb-3">3. User Accounts and Registration</h2>
-            <p>To access certain features of TuneTribes, you must create an account using Amazon Cognito authentication. You agree to:</p>
+            <p>
+                To access certain features, you may create an account using authentication such as Amazon
+                Cognito. You agree to:
+            </p>
             <ul>
                 <li>Provide accurate, current, and complete information during registration</li>
                 <li>Maintain and update your account information</li>
                 <li>Keep your login credentials secure and confidential</li>
                 <li>Accept responsibility for all activities under your account</li>
-                <li>Notify us immediately of any unauthorized use of your account</li>
+                <li>Notify us promptly of any unauthorized use of your account</li>
             </ul>
 
-            <h2 className="mb-3">4. Facial Recognition and Emotion Detection</h2>
-            <p>Our platform uses advanced facial recognition technology to enhance user experience. By using these features, you acknowledge and consent to:</p>
+            <h2 className="mb-3">4. Camera, Sensors, and Adaptive Processing</h2>
+            <p>
+                Where you enable them, camera or sensor-based features process information to infer mood,
+                reactions, or movement for adaptive playback. By using these features, you acknowledge that:
+            </p>
             <ul>
-                <li>Real-time processing of your facial expressions and emotions</li>
-                <li>Detection of head movements, nodding, and facial landmarks</li>
-                <li>Collection of emotion data including happy, surprised, sad, angry, fearful, and disgusted expressions</li>
-                <li>Processing of facial position and movement data</li>
-                <li>Use of this data to provide real-time audience engagement features</li>
-            </ul>
-            <p><strong>Important:</strong> You can disable camera access at any time, though this may limit certain platform features.</p>
-
-            <h2 className="mb-3">5. Content and Conduct</h2>
-            <p>As a user of TuneTribes, you agree to:</p>
-            <ul>
-                <li>Respect the rights of other users and creators</li>
-                <li>Not upload, stream, or share content that is illegal, harmful, or violates others' rights</li>
-                <li>Not use the platform for harassment, bullying, or inappropriate behavior</li>
-                <li>Not attempt to manipulate or abuse the emotion detection system</li>
-                <li>Not interfere with the platform's security or functionality</li>
-                <li>Comply with all applicable laws and regulations</li>
+                <li>Processing may occur in real time to operate the product</li>
+                <li>You can revoke camera or sensor permission through your device or browser settings; some
+                    features may then be unavailable</li>
+                <li>
+                    Details of what we collect and retain are set out in our Privacy Notice (including that we
+                    do not store raw camera video as a default archival product feature where stated)
+                </li>
             </ul>
 
-            <h2 className="mb-3">6. Creator Responsibilities</h2>
-            <p>If you create content or host sessions on TuneTribes, you:</p>
+            <h2 className="mb-3">5. Acceptable Use and Conduct</h2>
+            <p>When using TuneTribes, you agree to:</p>
             <ul>
-                <li>Are responsible for all content you stream or share</li>
-                <li>Must have the rights to any music or content you use</li>
-                <li>Are responsible for managing your session settings and user interactions</li>
-                <li>Must respect audience privacy and consent regarding emotion detection</li>
-                <li>Are responsible for maintaining appropriate behavior in your sessions</li>
+                <li>Use the software only for lawful purposes and in compliance with these Terms</li>
+                <li>Not harass others, misuse the service, or attempt to break or circumvent security</li>
+                <li>Not use the adaptive or sensor features in a way that endangers people or violates law</li>
+                <li>Not interfere with the proper functioning of the application or our infrastructure</li>
             </ul>
 
-            <h2 className="mb-3">7. Third-Party Platform Integration</h2>
-            <p>TuneTribes integrates with YouTube and Twitch streaming platforms through embedded content. By using these integrations, you acknowledge and agree that:</p>
-            <ul>
-                <li>You are bound by YouTube's Terms of Service and Community Guidelines when using YouTube embedding features</li>
-                <li>You are bound by Twitch's Terms of Service and Community Guidelines when using Twitch embedding features</li>
-                <li>TuneTribes is not responsible for any content, policies, or actions of YouTube or Twitch</li>
-                <li>TuneTribes is not liable for any violations of YouTube or Twitch terms that may occur through your use of their platforms</li>
-                <li>You are responsible for ensuring your content complies with both TuneTribes and the respective platform's terms of service</li>
-            </ul>
+            <h2 className="mb-3">6. Audio Content and Rights</h2>
+            <p>
+                You are responsible for the music and other audio you play through or alongside TuneTribes. You
+                must have the rights or licences needed for your use (for example personal listening or as
+                otherwise permitted). TuneTribes does not grant you any licence to reproduce, distribute, or
+                perform third-party recordings beyond what you already have.
+            </p>
 
-            <h2 className="mb-3">8. Points and Rewards System</h2>
-            <p>Our platform includes a points-based reward system where users can:</p>
-            <ul>
-                <li>Earn points through engagement and participation</li>
-                <li>Use points to request songs and influence playlists</li>
-                <li>Compete on leaderboards</li>
-                <li>Shape visual content and session experiences</li>
-            </ul>
-            <p>Points have no real-world monetary value and are subject to platform rules and limitations.</p>
+            <h2 className="mb-3">7. Third-Party Services</h2>
+            <p>
+                Optional connections (such as embedded players or external APIs) are subject to those
+                providers&apos; terms and privacy policies. TuneTribes is not responsible for third-party
+                content, availability, or practices.
+            </p>
+
+            <h2 className="mb-3">8. Optional Features and Experiments</h2>
+            <p>
+                Some builds may include experiments, surveys, or gamified elements (for example points or
+                leaderboards). Unless expressly stated otherwise, such elements have no cash value, may change
+                or end without notice, and are provided for engagement or research purposes only.
+            </p>
 
             <h2 className="mb-3">9. Privacy and Data Protection</h2>
-            <p>Your privacy is important to us. Our data collection and processing practices are detailed in our Privacy Notice. Key points include:</p>
-            <ul>
-                <li>Facial expression data is processed in real-time and not stored as raw video</li>
-                <li>Emotion detection data is used to enhance user experience</li>
-                <li>You can opt-out of camera-based features at any time</li>
-                <li>You have rights to access, modify, and delete your personal data</li>
-            </ul>
+            <p>
+                Our Privacy Notice describes how we handle personal data. By using TuneTribes, you confirm you
+                have reviewed it. Key expectations include real-time processing for features that need it,
+                choices you can make about camera or sensor use, and your rights regarding your data where
+                applicable law applies.
+            </p>
 
             <h2 className="mb-3">10. Technical Requirements</h2>
-            <p>To use TuneTribes effectively, you need:</p>
+            <p>Effective use of TuneTribes generally requires:</p>
             <ul>
-                <li>A compatible web browser with camera access</li>
-                <li>Stable internet connection for real-time streaming</li>
-                <li>Camera and microphone access for full feature functionality</li>
-                <li>JavaScript enabled for interactive features</li>
+                <li>A compatible web browser or supported environment</li>
+                <li>Network connectivity when features rely on our servers</li>
+                <li>Permission for camera, microphone, or other sensors when you choose features that need them</li>
+                <li>JavaScript enabled where the web app requires it</li>
             </ul>
 
             <h2 className="mb-3">11. Intellectual Property</h2>
-            <p>All content on TuneTribes, including but not limited to:</p>
-            <ul>
-                <li>Platform design, code, and functionality</li>
-                <li>User-generated content (subject to user rights)</li>
-                <li>Emotion detection algorithms and technology</li>
-                <li>Branding and trademarks</li>
-            </ul>
-            <p>is protected by intellectual property laws. Users retain rights to their original content.</p>
+            <p>
+                The TuneTribes software, branding, documentation, and underlying technology are protected by
+                intellectual property laws. You receive a limited, revocable licence to use the client
+                software as intended. You retain rights to content you own; you grant us only the rights
+                needed to operate the service as described in our policies.
+            </p>
 
             <h2 className="mb-3">12. Limitation of Liability</h2>
-            <p>TuneTribes is provided "as is" without warranties. We are not liable for:</p>
+            <p>TuneTribes is provided &quot;as is&quot; to the extent permitted by law. We are not liable for:</p>
             <ul>
-                <li>Service interruptions or technical issues</li>
-                <li>User-generated content or interactions</li>
-                <li>Emotion detection accuracy or reliability</li>
-                <li>Third-party content or services</li>
-                <li>Indirect, incidental, or consequential damages</li>
+                <li>Interruptions, bugs, or unavailability</li>
+                <li>Decisions you make based on adaptive playback or inferred mood</li>
+                <li>Third-party services or content</li>
+                <li>Indirect or consequential damages, within limits allowed by applicable law</li>
             </ul>
 
             <h2 className="mb-3">13. Termination</h2>
-            <p>We may terminate or suspend your account if you:</p>
-            <ul>
-                <li>Violate these Terms of Use</li>
-                <li>Engage in harmful or inappropriate behavior</li>
-                <li>Attempt to abuse or manipulate platform features</li>
-                <li>Violate applicable laws or regulations</li>
-            </ul>
-            <p>You may terminate your account at any time by contacting us.</p>
+            <p>We may suspend or terminate access if you breach these Terms or misuse the service. You may stop using TuneTribes at any time.</p>
 
             <h2 className="mb-3">14. Changes to Terms</h2>
-            <p>We may update these Terms of Use from time to time. We will notify users of significant changes through the platform or other communication channels. Continued use of the service after changes constitutes acceptance of the new terms.</p>
+            <p>
+                We may update these Terms. Material changes may be communicated through the app or other
+                reasonable means. Continued use after changes become effective constitutes acceptance unless
+                prohibited by law.
+            </p>
 
             <h2 className="mb-3">15. Governing Law</h2>
-            <p>These Terms of Use are governed by applicable laws. Any disputes will be resolved through appropriate legal channels.</p>
+            <p>These Terms are governed by applicable law. Disputes will be handled through appropriate legal channels.</p>
 
-            <h2 className="mb-3">16. Contact Information</h2>
-            <p>For questions about these Terms of Use or the TuneTribes platform, please contact us at:</p>
-            <p><strong>Email:</strong> info@tunetribes.live</p>
+            <h2 className="mb-3">16. Contact</h2>
+            <p>
+                For questions about these Terms, please{' '}
+                <a href="https://www.tunetribes.live/contact" target="_blank" rel="noopener noreferrer">
+                    contact us
+                </a>
+                .
+            </p>
         </>
     );
 };

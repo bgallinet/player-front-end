@@ -6,7 +6,6 @@
  */
 
 import { useCallback, useEffect, useRef } from 'react';
-import EnvironmentVariables from '../../utils/EnvironmentVariables';
 import {
     REACTION_MAPPER_UPDATE_INTERVAL,
     EMOTION_ANALYSIS_WINDOW,
@@ -21,11 +20,9 @@ import { ingestSensingFeedIntoBuffer } from '../../music_adaptation/policy/compi
 import { emptyReactionSensingFeedSnapshot, normalizeReactionSensingFeed } from '../../music_adaptation/feeds/reactionSensingFeed';
 import UnifiedSensingUserUI from '../sensing_UI/UnifiedSensingUserUI';
 
-const ADAPTATION_DEV_DATA_LOG_MS = 500;
-
 /** Named exports — EQ presets live under `music_adaptation/policy`. */
 
-export { EQ_PRESETS, resolveEqVector } from '../../music_adaptation/policy/eqPresetVectors.v1';
+export { EQ_PRESETS, resolveEqVector } from '../../music_adaptation/policy/fixed_mappings/eqPresetVectors.v1';
 
 export {
     DEFAULT_EQ_MAPPINGS,
@@ -37,19 +34,19 @@ export {
     DEFAULT_BPM_SHIFT_MAPPINGS,
     resolveVolumeMultiplierForPlaybackProfile,
     resolveKeyShiftForPlaybackProfile,
-} from '../../music_adaptation/policy/reactionMappingDefaults.v1';
+} from '../../music_adaptation/policy/fixed_mappings/reactionMappingDefaults.v1';
 
 export {
     resolveVolumeMultiplierForPlaybackProfile as resolveVolumeMultiplierForEmotion,
     resolveKeyShiftForPlaybackProfile as resolveKeyShiftSemitonesForEmotion,
-} from '../../music_adaptation/policy/reactionMappingDefaults.v1';
+} from '../../music_adaptation/policy/fixed_mappings/reactionMappingDefaults.v1';
 
 export {
     REACTION_PLAYBACK_PROFILE,
     REACTION_PLAYBACK_PROFILE_UI_ROWS,
     DOMINANT_FACE_TONE,
     playbackProfileUsesNoddingVolume,
-} from '../../music_adaptation/policy/reactionPlaybackProfiles.v1';
+} from '../../music_adaptation/policy/fixed_mappings/reactionPlaybackProfiles.v1';
 
 export {
     createBuiltinStaticReactionPolicyInstance,
@@ -63,7 +60,6 @@ export {
  * @param {{
  *   policyBundleRef: React.MutableRefObject<import('../../music_adaptation/policy/reactionPolicyBundle').ReactionPolicyBundleSnapshot>,
  *   stream?: MediaStream | null,
- *   isDemoSession?: boolean,
  *   sensingSessionName?: string,
  *   sensingSizeMode?: 'large' | 'small',
  *   autoStartLandmarkTick?: number,
@@ -80,7 +76,6 @@ export {
 const AdaptationOrchestrator = ({
     policyBundleRef,
     stream = null,
-    isDemoSession = false,
     sensingSessionName = 'player_session',
     sensingSizeMode = 'large',
     autoStartLandmarkTick = 0,
@@ -92,25 +87,18 @@ const AdaptationOrchestrator = ({
     const { bufferRef } = useCueTimeline({ retentionMs: CUE_RING_RETENTION_MS });
     const reactionSensingFeedRef = useRef(emptyReactionSensingFeedSnapshot());
     const prevDominantFaceToneRef = useRef(null);
-    const adaptationDevDataLogLastMsRef = useRef(0);
+    const persistentThumbBpmStateRef = useRef({
+        persistentDeltaBpm: 0,
+        prevThumbUpActive: false,
+        prevThumbDownActive: false,
+    });
 
     const handleSensingFeedFrame = useCallback(
         (snap) => {
             const normalized = normalizeReactionSensingFeed(snap);
             reactionSensingFeedRef.current = normalized;
             const nowMs = Date.now();
-            const policyIngestRow = ingestSensingFeedIntoBuffer(bufferRef.current, normalized, nowMs);
-
-            if (EnvironmentVariables.environment_flag === 'dev') {
-                if (nowMs - adaptationDevDataLogLastMsRef.current >= ADAPTATION_DEV_DATA_LOG_MS) {
-                    adaptationDevDataLogLastMsRef.current = nowMs;
-                    console.log('[AdaptationOrchestrator] policy ingest row (actual payload) %o', {
-                        nowMs,
-                        policyIngestRow,
-                    });
-                }
-            }
-
+            ingestSensingFeedIntoBuffer(bufferRef.current, normalized, nowMs);
         },
         [bufferRef],
     );
@@ -119,6 +107,8 @@ const AdaptationOrchestrator = ({
         policyBundleRef,
         bufferRef,
         prevDominantFaceToneRef,
+        persistentThumbBpmStateRef,
+        latestSensingFeedRef: reactionSensingFeedRef,
         analysisWindowMs: EMOTION_ANALYSIS_WINDOW,
         sampleHz: CUE_RING_SAMPLE_HZ,
         updateIntervalMs: REACTION_MAPPER_UPDATE_INTERVAL,
@@ -150,7 +140,6 @@ const AdaptationOrchestrator = ({
         <UnifiedSensingUserUI
             stream={stream}
             embeddingTW={false}
-            is_demo_session={isDemoSession}
             sessionName={sensingSessionName}
             onSensingFeedFrame={handleSensingFeedFrame}
             sizeMode={sensingSizeMode}

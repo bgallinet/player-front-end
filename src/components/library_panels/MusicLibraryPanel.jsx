@@ -30,7 +30,7 @@ import { Subtitle, Text } from '../../styles/StyledComponents';
 import { secondaryColor } from '../../utils/DisplaySettings';
 import ExpandReduceButton from '../../buttons/ExpandReduceButton';
 
-const MusicLibraryPanel = ({ show, onHide, onFileSelect, onAddToPlaylist, onFolderLoaded, isDemoSession = false, musicFiles = [], playlist = [] }) => {
+const MusicLibraryPanel = ({ show, onHide, onFileSelect, onAddToPlaylist, onFolderLoaded, musicFiles = [], playlist = [] }) => {
     const [currentPath, setCurrentPath] = useState('');
     const [folderContents, setFolderContents] = useState([]);
     const [loading, setLoading] = useState(false);

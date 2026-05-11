@@ -1,575 +1,251 @@
-/**
- * SoundCloudLibraryPanel Component
- * 
- * Provides a browsing interface for SoundCloud content, similar to MusicLibraryPanel
- * but for streaming tracks instead of local files.
- * 
- * FEATURES:
- * - Search SoundCloud tracks
- * - Browse user's own tracks
- * - Browse user's liked tracks
- * - Browse user's playlists
- * - Play and add-to-playlist buttons per track
- * - Track artwork, title, artist, and duration display
- */
-
-import React, { useState, useCallback, useEffect } from 'react';
-import { Button, Form, Spinner, Nav } from 'react-bootstrap';
-import { Subtitle, Text } from '../../styles/StyledComponents';
-import { secondaryColor } from '../../utils/DisplaySettings';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Button, Form, Spinner } from 'react-bootstrap';
+import { Text } from '../../styles/StyledComponents';
 import {
-    searchTracks,
     getMyTracks,
     getMyLikes,
     getMyPlaylists,
     getPlaylistTracks,
+    searchTracks,
     normalizeTrack,
-    formatDuration,
-    soundCloudTrackIdForApi,
 } from '../../utils/soundcloudService';
 
-const PAGE_SIZE = 30;
+const VIEW = Object.freeze({
+    TRACKS: 'tracks',
+    LIKES: 'likes',
+    PLAYLISTS: 'playlists',
+    SEARCH: 'search',
+});
 
-/** Scroll region for long track / playlist lists (flex-friendly + touch momentum). */
-const SCROLLABLE_LIST_STYLE = {
-    flex: '1 1 auto',
-    minHeight: 0,
-    maxHeight: 'min(55vh, 520px)',
-    overflowY: 'auto',
-    overflowX: 'hidden',
-    WebkitOverflowScrolling: 'touch',
-    overscrollBehavior: 'contain',
-};
-
-const SoundCloudLibraryPanel = ({
-    show,
-    accessToken,
-    onTrackSelect,
-    onAddToPlaylist,
-    playlist = [],
-}) => {
-    const [activeTab, setActiveTab] = useState('search');
-    const [searchTerm, setSearchTerm] = useState('');
+const SoundCloudLibraryPanel = ({ show, accessToken, onTrackSelect, onAddToPlaylist, playlist = [] }) => {
+    const [view, setView] = useState(VIEW.TRACKS);
     const [tracks, setTracks] = useState([]);
     const [playlists, setPlaylists] = useState([]);
-    const [selectedPlaylist, setSelectedPlaylist] = useState(null);
+    const [selectedPlaylistId, setSelectedPlaylistId] = useState(null);
+    const [playlistTracks, setPlaylistTracks] = useState([]);
+    const [searchQuery, setSearchQuery] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
-    const [offset, setOffset] = useState(0);
-    const [hasMore, setHasMore] = useState(true);
 
-    // Check if a SoundCloud track is already in the playlist
-    const isTrackInPlaylist = useCallback((scTrack) => {
-        const trackId = soundCloudTrackIdForApi(scTrack) ?? scTrack.urn ?? scTrack.id;
-        return playlist.some((t) => t.id === trackId);
-    }, [playlist]);
+    const playlistIds = useMemo(() => new Set((playlist || []).map((t) => t?.id).filter(Boolean)), [playlist]);
 
-    // Load tracks based on active tab
-    const loadTracks = useCallback(async (resetOffset = true) => {
-        if (!accessToken && activeTab !== 'search') return;
+    const toNormalized = useCallback((arr) => (Array.isArray(arr) ? arr.map(normalizeTrack) : []), []);
 
+    const loadTracks = useCallback(async () => {
+        if (!accessToken) return;
         setLoading(true);
         setError('');
-        const currentOffset = resetOffset ? 0 : offset;
-
         try {
-            let result = [];
-
-            switch (activeTab) {
-                case 'search':
-                    if (!searchTerm.trim()) {
-                        setTracks([]);
-                        setLoading(false);
-                        return;
-                    }
-                    result = await searchTracks(searchTerm, accessToken, PAGE_SIZE, currentOffset);
-                    break;
-                case 'mytracks':
-                    result = await getMyTracks(accessToken, PAGE_SIZE, currentOffset);
-                    if (result.collection) result = result.collection;
-                    break;
-                case 'likes':
-                    result = await getMyLikes(accessToken, PAGE_SIZE, currentOffset);
-                    break;
-                case 'playlists':
-                    if (selectedPlaylist) {
-                        result = await getPlaylistTracks(selectedPlaylist.id, accessToken);
-                    } else {
-                        const playlistData = await getMyPlaylists(accessToken, PAGE_SIZE, currentOffset);
-                        const playlistList = playlistData.collection || playlistData;
-                        setPlaylists(Array.isArray(playlistList) ? playlistList : []);
-                        setLoading(false);
-                        return;
-                    }
-                    break;
-                default:
-                    break;
-            }
-
-            const trackList = Array.isArray(result) ? result : [];
-            setHasMore(trackList.length === PAGE_SIZE);
-
-            if (activeTab === 'playlists' && selectedPlaylist) {
-                const expected = selectedPlaylist.track_count ?? selectedPlaylist.tracks_count;
-                const countsMatch =
-                    expected == null ? null : Number(expected) === trackList.length;
-                console.info('[SoundCloud playlist UI]', {
-                    tracksInList: trackList.length,
-                    playlistTrackCount: expected ?? '(not on playlist object)',
-                    countsMatch: countsMatch === null ? 'n/a' : countsMatch ? 'yes' : 'NO',
-                    tip:
-                        'Fetch/pagination logs: localStorage.setItem("DEBUG_SC_PLAYLIST","1") then reload — filter console by [SoundCloud playlist]',
-                });
-            }
-
-            if (resetOffset) {
-                setTracks(trackList);
-                setOffset(PAGE_SIZE);
-            } else {
-                setTracks(prev => [...prev, ...trackList]);
-                setOffset(prev => prev + PAGE_SIZE);
-            }
-        } catch (err) {
-            console.error('Failed to load SoundCloud tracks:', err);
-            setError(err.message || 'Failed to load tracks.');
+            const data = await getMyTracks(accessToken, 100, 0);
+            setTracks(toNormalized(data));
+        } catch (e) {
+            setError(e.message || 'Failed to load SoundCloud tracks');
         } finally {
             setLoading(false);
         }
-    }, [accessToken, activeTab, searchTerm, offset, selectedPlaylist]);
+    }, [accessToken, toNormalized]);
 
-    // Load on tab change
+    const loadLikes = useCallback(async () => {
+        if (!accessToken) return;
+        setLoading(true);
+        setError('');
+        try {
+            const data = await getMyLikes(accessToken, 100, 0);
+            setTracks(toNormalized(data));
+        } catch (e) {
+            setError(e.message || 'Failed to load liked tracks');
+        } finally {
+            setLoading(false);
+        }
+    }, [accessToken, toNormalized]);
+
+    const loadPlaylists = useCallback(async () => {
+        if (!accessToken) return;
+        setLoading(true);
+        setError('');
+        try {
+            const data = await getMyPlaylists(accessToken, 100, 0);
+            setPlaylists(Array.isArray(data) ? data : data?.collection || []);
+        } catch (e) {
+            setError(e.message || 'Failed to load playlists');
+        } finally {
+            setLoading(false);
+        }
+    }, [accessToken]);
+
+    const loadPlaylistTracks = useCallback(
+        async (playlistId) => {
+            if (!accessToken || !playlistId) return;
+            setLoading(true);
+            setError('');
+            try {
+                const data = await getPlaylistTracks(playlistId, accessToken);
+                setPlaylistTracks(toNormalized(data));
+            } catch (e) {
+                setError(e.message || 'Failed to load playlist tracks');
+            } finally {
+                setLoading(false);
+            }
+        },
+        [accessToken, toNormalized],
+    );
+
+    const runSearch = useCallback(async () => {
+        if (!accessToken || !searchQuery.trim()) return;
+        setLoading(true);
+        setError('');
+        try {
+            const data = await searchTracks(searchQuery.trim(), accessToken, 50, 0);
+            setTracks(toNormalized(data));
+        } catch (e) {
+            setError(e.message || 'Search failed');
+        } finally {
+            setLoading(false);
+        }
+    }, [accessToken, searchQuery, toNormalized]);
+
     useEffect(() => {
-        if (show && activeTab !== 'search') {
-            setSelectedPlaylist(null);
-            loadTracks(true);
-        }
-    }, [activeTab, show]); // eslint-disable-line react-hooks/exhaustive-deps
-
-    // Handle search submit
-    const handleSearch = useCallback((e) => {
-        e.preventDefault();
-        if (searchTerm.trim()) {
-            loadTracks(true);
-        }
-    }, [searchTerm, loadTracks]);
-
-    // Handle track click (play immediately)
-    const handleTrackClick = useCallback((scTrack) => {
-        const normalized = normalizeTrack(scTrack);
-        onTrackSelect(normalized);
-    }, [onTrackSelect]);
-
-    // Handle drag start to load a track into a deck
-    const handleTrackDragStart = useCallback((e, scTrack) => {
-        const normalized = normalizeTrack(scTrack);
-        e.dataTransfer.effectAllowed = 'copy';
-        e.dataTransfer.setData('text/plain', normalized.name || normalized.title || 'soundcloud-track');
-        e.dataTransfer.setData('application/x-soundbloom-track', JSON.stringify(normalized));
-        window.draggedTrack = normalized;
-    }, []);
-
-    // Handle add to playlist
-    const handleAddToPlaylist = useCallback((scTrack, e) => {
-        e.stopPropagation();
-        if (!isTrackInPlaylist(scTrack)) {
-            const normalized = normalizeTrack(scTrack);
-            onAddToPlaylist(normalized);
-        }
-    }, [onAddToPlaylist, isTrackInPlaylist]);
-
-    // Handle playlist selection
-    const handlePlaylistClick = useCallback((pl) => {
-        setSelectedPlaylist(pl);
-        setTracks([]);
-        setOffset(0);
-    }, []);
-
-    // Load playlist tracks when selected
-    useEffect(() => {
-        if (selectedPlaylist) {
-            loadTracks(true);
-        }
-    }, [selectedPlaylist]); // eslint-disable-line react-hooks/exhaustive-deps
-
-    // Get high-res artwork URL
-    const getArtworkUrl = useCallback((url) => {
-        if (!url) return null;
-        return url.replace('-large', '-t200x200');
-    }, []);
+        if (!show || !accessToken) return;
+        if (view === VIEW.TRACKS) loadTracks();
+        else if (view === VIEW.LIKES) loadLikes();
+        else if (view === VIEW.PLAYLISTS) loadPlaylists();
+    }, [show, accessToken, view, loadTracks, loadLikes, loadPlaylists]);
 
     if (!show) return null;
 
     return (
-        <div style={{
-            width: '100%',
-            backgroundColor: 'transparent',
-            display: 'flex',
-            flexDirection: 'column',
-            flex: '1 1 auto',
-            minHeight: 0,
-        }}>
-            {/* Tab Navigation */}
-            <Nav
-                variant="tabs"
-                activeKey={activeTab}
-                onSelect={(key) => setActiveTab(key)}
-                className="mb-3"
-                style={{ borderBottomColor: '#333' }}
-            >
-                <Nav.Item>
-                    <Nav.Link
-                        eventKey="search"
-                        style={{
-                            color: activeTab === 'search' ? secondaryColor : '#999',
-                            backgroundColor: activeTab === 'search' ? '#2a2a2a' : 'transparent',
-                            borderColor: activeTab === 'search' ? `${secondaryColor} ${secondaryColor} #2a2a2a` : 'transparent',
-                            fontSize: '0.85rem',
+        <div>
+            <div className="d-flex gap-2 flex-wrap mb-3">
+                <Button size="sm" variant={view === VIEW.TRACKS ? 'light' : 'outline-light'} onClick={() => setView(VIEW.TRACKS)}>
+                    My Tracks
+                </Button>
+                <Button size="sm" variant={view === VIEW.LIKES ? 'light' : 'outline-light'} onClick={() => setView(VIEW.LIKES)}>
+                    Likes
+                </Button>
+                <Button
+                    size="sm"
+                    variant={view === VIEW.PLAYLISTS ? 'light' : 'outline-light'}
+                    onClick={() => {
+                        setSelectedPlaylistId(null);
+                        setPlaylistTracks([]);
+                        setView(VIEW.PLAYLISTS);
+                    }}
+                >
+                    Playlists
+                </Button>
+                <Button size="sm" variant={view === VIEW.SEARCH ? 'light' : 'outline-light'} onClick={() => setView(VIEW.SEARCH)}>
+                    Search
+                </Button>
+            </div>
+
+            {view === VIEW.SEARCH && (
+                <div className="d-flex gap-2 mb-3">
+                    <Form.Control
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="Search SoundCloud tracks..."
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                                e.preventDefault();
+                                runSearch();
+                            }
                         }}
-                    >
+                    />
+                    <Button variant="outline-light" onClick={runSearch}>
                         Search
-                    </Nav.Link>
-                </Nav.Item>
-                <Nav.Item>
-                    <Nav.Link
-                        eventKey="mytracks"
-                        style={{
-                            color: activeTab === 'mytracks' ? secondaryColor : '#999',
-                            backgroundColor: activeTab === 'mytracks' ? '#2a2a2a' : 'transparent',
-                            borderColor: activeTab === 'mytracks' ? `${secondaryColor} ${secondaryColor} #2a2a2a` : 'transparent',
-                            fontSize: '0.85rem',
-                        }}
-                    >
-                        My Tracks
-                    </Nav.Link>
-                </Nav.Item>
-                <Nav.Item>
-                    <Nav.Link
-                        eventKey="likes"
-                        style={{
-                            color: activeTab === 'likes' ? secondaryColor : '#999',
-                            backgroundColor: activeTab === 'likes' ? '#2a2a2a' : 'transparent',
-                            borderColor: activeTab === 'likes' ? `${secondaryColor} ${secondaryColor} #2a2a2a` : 'transparent',
-                            fontSize: '0.85rem',
-                        }}
-                    >
-                        Likes
-                    </Nav.Link>
-                </Nav.Item>
-                <Nav.Item>
-                    <Nav.Link
-                        eventKey="playlists"
-                        style={{
-                            color: activeTab === 'playlists' ? secondaryColor : '#999',
-                            backgroundColor: activeTab === 'playlists' ? '#2a2a2a' : 'transparent',
-                            borderColor: activeTab === 'playlists' ? `${secondaryColor} ${secondaryColor} #2a2a2a` : 'transparent',
-                            fontSize: '0.85rem',
-                        }}
-                    >
-                        Playlists
-                    </Nav.Link>
-                </Nav.Item>
-            </Nav>
-
-            {/* Search Bar (always visible on search tab) */}
-            {activeTab === 'search' && (
-                <Form onSubmit={handleSearch} className="mb-3">
-                    <div className="d-flex gap-2">
-                        <Form.Control
-                            type="text"
-                            placeholder="Search SoundCloud..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            style={{
-                                borderColor: secondaryColor,
-                                fontSize: '0.9rem',
-                                backgroundColor: '#2a2a2a',
-                                color: 'white',
-                            }}
-                        />
-                        <Button
-                            type="submit"
-                            variant="outline-light"
-                            disabled={loading || !searchTerm.trim()}
-                            style={{
-                                borderColor: secondaryColor,
-                                fontSize: '0.85rem',
-                                whiteSpace: 'nowrap',
-                            }}
-                        >
-                            {loading ? <Spinner size="sm" /> : 'Search'}
-                        </Button>
-                    </div>
-                </Form>
-            )}
-
-            {/* Playlist breadcrumb */}
-            {activeTab === 'playlists' && selectedPlaylist && (
-                <div className="d-flex align-items-center mb-2">
-                    <span
-                        onClick={() => { setSelectedPlaylist(null); setTracks([]); loadTracks(true); }}
-                        style={{
-                            cursor: 'pointer',
-                            color: secondaryColor,
-                            fontSize: '0.85rem',
-                            textDecoration: 'underline',
-                        }}
-                    >
-                        Playlists
-                    </span>
-                    <span style={{ margin: '0 0.5rem', color: '#666' }}>/</span>
-                    <Text style={{ margin: 0, fontSize: '0.85rem', fontWeight: 'bold' }}>
-                        {selectedPlaylist.title}
-                    </Text>
+                    </Button>
                 </div>
             )}
 
-            {/* Error Display */}
             {error && (
-                <div className="alert alert-danger" style={{ fontSize: '0.8rem' }}>
+                <div className="alert alert-danger py-2 mb-3">
                     {error}
                 </div>
             )}
 
-            {/* Loading Indicator */}
-            {loading && tracks.length === 0 && (
-                <div className="text-center py-3">
-                    <Spinner size="sm" className="me-2" />
-                    <Text style={{ opacity: 0.8, fontSize: '0.8rem', display: 'inline' }}>Loading...</Text>
+            {loading ? (
+                <div className="d-flex align-items-center gap-2 py-3">
+                    <Spinner size="sm" animation="border" />
+                    <Text style={{ margin: 0 }}>Loading...</Text>
                 </div>
-            )}
+            ) : null}
 
-            {/* Playlist List (when no playlist is selected) */}
-            {activeTab === 'playlists' && !selectedPlaylist && !loading && (
-                <div style={SCROLLABLE_LIST_STYLE}>
-                    {playlists.length === 0 ? (
-                        <div className="text-center py-4">
-                            <Text style={{ opacity: 0.6, fontSize: '0.8rem' }}>
-                                No playlists found.
-                            </Text>
-                        </div>
-                    ) : (
-                        playlists.map((pl) => (
-                            <div
+            {view === VIEW.PLAYLISTS ? (
+                <div>
+                    <div className="d-flex gap-2 flex-wrap mb-2">
+                        {(playlists || []).map((pl) => (
+                            <Button
                                 key={pl.id}
-                                className="d-flex align-items-center p-2 mb-1 rounded"
-                                style={{
-                                    backgroundColor: '#2a2a2a',
-                                    border: '1px solid #333',
-                                    cursor: 'pointer',
-                                    transition: 'all 0.2s ease',
-                                    fontSize: '0.8rem',
-                                }}
-                                onClick={() => handlePlaylistClick(pl)}
-                                onMouseEnter={(e) => {
-                                    e.currentTarget.style.backgroundColor = '#3a3a3a';
-                                    e.currentTarget.style.borderColor = secondaryColor;
-                                }}
-                                onMouseLeave={(e) => {
-                                    e.currentTarget.style.backgroundColor = '#2a2a2a';
-                                    e.currentTarget.style.borderColor = '#333';
+                                size="sm"
+                                variant={selectedPlaylistId === pl.id ? 'light' : 'outline-light'}
+                                onClick={() => {
+                                    setSelectedPlaylistId(pl.id);
+                                    void loadPlaylistTracks(pl.id);
                                 }}
                             >
-                                {/* Playlist Artwork */}
-                                {pl.artwork_url && (
-                                    <img
-                                        src={getArtworkUrl(pl.artwork_url)}
-                                        alt=""
-                                        style={{
-                                            width: '40px',
-                                            height: '40px',
-                                            borderRadius: '4px',
-                                            marginRight: '0.75rem',
-                                            objectFit: 'cover',
-                                        }}
-                                    />
-                                )}
-                                {!pl.artwork_url && (
-                                    <div style={{
-                                        width: '40px',
-                                        height: '40px',
-                                        borderRadius: '4px',
-                                        marginRight: '0.75rem',
-                                        backgroundColor: '#444',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        fontSize: '1.2rem',
-                                    }}>
-                                        📋
-                                    </div>
-                                )}
-                                <div className="flex-grow-1" style={{ minWidth: 0 }}>
-                                    <Text style={{
-                                        margin: 0,
-                                        fontWeight: 'bold',
-                                        fontSize: '0.8rem',
-                                        overflow: 'hidden',
-                                        textOverflow: 'ellipsis',
-                                        whiteSpace: 'nowrap',
-                                    }}>
-                                        {pl.title}
-                                    </Text>
-                                    <Text style={{ margin: 0, fontSize: '0.7rem', opacity: 0.7 }}>
-                                        {pl.track_count || 0} tracks
-                                    </Text>
-                                </div>
-                                <div style={{ fontSize: '1rem', opacity: 0.6 }}>→</div>
-                            </div>
-                        ))
-                    )}
+                                {pl.title || pl.permalink || `Playlist ${pl.id}`}
+                            </Button>
+                        ))}
+                    </div>
+                    {selectedPlaylistId && playlistTracks.length === 0 && !loading ? (
+                        <Text style={{ opacity: 0.7 }}>No tracks found in this playlist.</Text>
+                    ) : null}
+                    {selectedPlaylistId && playlistTracks.length > 0 ? (
+                        <TrackRows
+                            rows={playlistTracks}
+                            playlistIds={playlistIds}
+                            onTrackSelect={onTrackSelect}
+                            onAddToPlaylist={onAddToPlaylist}
+                        />
+                    ) : null}
                 </div>
-            )}
-
-            {/* Track List */}
-            {(activeTab !== 'playlists' || selectedPlaylist) && !loading && (
-                <div style={SCROLLABLE_LIST_STYLE}>
-                    {tracks.length === 0 && !loading ? (
-                        <div className="text-center py-4">
-                            <Text style={{ opacity: 0.6, fontSize: '0.8rem' }}>
-                                {activeTab === 'search'
-                                    ? (searchTerm ? 'No tracks found.' : 'Search for tracks on SoundCloud.')
-                                    : 'No tracks found.'}
-                            </Text>
-                        </div>
-                    ) : (
-                        <>
-                            {tracks.map((track, index) => (
-                                <div
-                                    key={`${track.id ?? 'sc'}-${index}`}
-                                    draggable
-                                    onDragStart={(e) => handleTrackDragStart(e, track)}
-                                    onDragEnd={() => {
-                                        setTimeout(() => {
-                                            window.draggedTrack = null;
-                                        }, 100);
-                                    }}
-                                    className="d-flex align-items-center p-2 mb-1 rounded"
-                                    style={{
-                                        backgroundColor: '#2a2a2a',
-                                        border: '1px solid #333',
-                                        cursor: 'pointer',
-                                        transition: 'all 0.2s ease',
-                                        fontSize: '0.8rem',
-                                    }}
-                                    onClick={() => handleTrackClick(track)}
-                                    onMouseEnter={(e) => {
-                                        e.currentTarget.style.backgroundColor = '#3a3a3a';
-                                        e.currentTarget.style.borderColor = secondaryColor;
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        e.currentTarget.style.backgroundColor = '#2a2a2a';
-                                        e.currentTarget.style.borderColor = '#333';
-                                    }}
-                                >
-                                    {/* Track Artwork */}
-                                    {track.artwork_url ? (
-                                        <img
-                                            src={getArtworkUrl(track.artwork_url)}
-                                            alt=""
-                                            style={{
-                                                width: '40px',
-                                                height: '40px',
-                                                borderRadius: '4px',
-                                                marginRight: '0.75rem',
-                                                objectFit: 'cover',
-                                            }}
-                                        />
-                                    ) : (
-                                        <div style={{
-                                            width: '40px',
-                                            height: '40px',
-                                            borderRadius: '4px',
-                                            marginRight: '0.75rem',
-                                            backgroundColor: '#444',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            fontSize: '1.2rem',
-                                        }}>
-                                            🎵
-                                        </div>
-                                    )}
-
-                                    {/* Track Info */}
-                                    <div className="flex-grow-1" style={{ minWidth: 0 }}>
-                                        <Text style={{
-                                            margin: 0,
-                                            fontWeight: 'bold',
-                                            fontSize: '0.8rem',
-                                            overflow: 'hidden',
-                                            textOverflow: 'ellipsis',
-                                            whiteSpace: 'nowrap',
-                                        }}>
-                                            {track.title}
-                                        </Text>
-                                        <Text style={{ margin: 0, fontSize: '0.7rem', opacity: 0.7 }}>
-                                            {track.user?.username || 'Unknown'} · {formatDuration(track.duration)}
-                                        </Text>
-                                    </div>
-
-                                    {/* Add to Playlist Button */}
-                                    <div style={{ display: 'flex', gap: '0.25rem' }}>
-                                        {!isTrackInPlaylist(track) ? (
-                                            <Button
-                                                variant="outline-light"
-                                                size="sm"
-                                                onClick={(e) => handleAddToPlaylist(track, e)}
-                                                style={{
-                                                    borderColor: secondaryColor,
-                                                    padding: '0.1rem 0.3rem',
-                                                    fontSize: '0.7rem',
-                                                    minWidth: '24px',
-                                                    height: '24px',
-                                                }}
-                                                title="Add to Playlist"
-                                            >
-                                                +
-                                            </Button>
-                                        ) : (
-                                            <div
-                                                style={{
-                                                    padding: '0.1rem 0.3rem',
-                                                    fontSize: '0.7rem',
-                                                    minWidth: '24px',
-                                                    height: '24px',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'center',
-                                                    color: '#28a745',
-                                                    fontWeight: 'bold',
-                                                }}
-                                                title="Already in Playlist"
-                                            >
-                                                ✓
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            ))}
-
-                            {/* Load More Button */}
-                            {hasMore && tracks.length > 0 && (
-                                <div className="text-center py-2">
-                                    <Button
-                                        variant="outline-light"
-                                        size="sm"
-                                        onClick={() => loadTracks(false)}
-                                        disabled={loading}
-                                        style={{
-                                            borderColor: secondaryColor,
-                                            fontSize: '0.8rem',
-                                        }}
-                                    >
-                                        {loading ? <Spinner size="sm" /> : 'Load More'}
-                                    </Button>
-                                </div>
-                            )}
-                        </>
-                    )}
-                </div>
+            ) : (
+                <TrackRows rows={tracks} playlistIds={playlistIds} onTrackSelect={onTrackSelect} onAddToPlaylist={onAddToPlaylist} />
             )}
         </div>
     );
 };
+
+function TrackRows({ rows, playlistIds, onTrackSelect, onAddToPlaylist }) {
+    if (!rows || rows.length === 0) {
+        return <Text style={{ opacity: 0.7 }}>No tracks to display.</Text>;
+    }
+    return (
+        <div style={{ maxHeight: '420px', overflowY: 'auto' }}>
+            {rows.map((track) => {
+                const inPlaylist = playlistIds.has(track?.id);
+                return (
+                    <div
+                        key={`${track?.id}-${track?.name}`}
+                        className="d-flex justify-content-between align-items-center border-bottom py-2"
+                        style={{ borderColor: '#333' }}
+                    >
+                        <div style={{ minWidth: 0 }}>
+                            <Text style={{ margin: 0, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {track?.name || 'Unknown track'}
+                            </Text>
+                            <Text style={{ margin: 0, fontSize: '0.8rem', opacity: 0.7 }}>
+                                {(track?.duration || 0).toFixed ? `${Math.round(track.duration)}s` : ''}
+                            </Text>
+                        </div>
+                        <div className="d-flex gap-2">
+                            <Button size="sm" variant="outline-light" onClick={() => onTrackSelect?.(track)}>
+                                Play
+                            </Button>
+                            <Button
+                                size="sm"
+                                variant={inPlaylist ? 'secondary' : 'outline-light'}
+                                onClick={() => onAddToPlaylist?.(track)}
+                                disabled={inPlaylist}
+                            >
+                                {inPlaylist ? 'Added' : '+'}
+                            </Button>
+                        </div>
+                    </div>
+                );
+            })}
+        </div>
+    );
+}
 
 export default SoundCloudLibraryPanel;

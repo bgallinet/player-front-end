@@ -8,7 +8,7 @@ import {
     THRESHOLD_SMILING,
     THRESHOLD_SMILING_LOW,
 } from '../ReactionMapperConfig';
-import { DOMINANT_FACE_TONE } from './reactionPlaybackProfiles.v1';
+import { DOMINANT_FACE_TONE } from './fixed_mappings/reactionPlaybackProfiles.v1';
 
 /**
  * @param {Record<string, number>} meanWindowChannels keyed by cue schema ids
