@@ -65,21 +65,24 @@ const CHOICE_OPTIONS = [
     AGE_RANGE_OPTIONS,
 ];
 
+const DEFAULT_INTRO =
+    'Tell us how you listen to music. This helps us improve the experience. You can update your answers anytime from Profile.';
+
 /**
- * Modal evaluation shown once after OAuth when the backend reports a newly created user.
+ * Listening profile survey; persisted to `listening_profiles` via User API (not evaluation_forms).
  */
-export default function NewUserListeningSurveyForm({ show, onHide }) {
+export default function UserProfileForm({ show, onHide, introText = DEFAULT_INTRO }) {
     return (
         <Form
             show={show}
             onHide={onHide}
-            introText="Welcome! Tell us a bit about how you listen to music. This helps us improve the experience."
+            introText={introText}
             questions={QUESTIONS}
             inputTypes={INPUT_TYPES}
             choiceOptions={CHOICE_OPTIONS}
             optionalQuestionIndices={[2, 4]}
             scaleLabelTypes={[]}
-            sessionName="new_user_onboarding"
+            sessionName="user_listening_profile"
             formMetadata={{ survey_id: 'listening_profile_v1' }}
             persistListeningProfileToUserProfile
         />

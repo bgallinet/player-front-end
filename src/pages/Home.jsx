@@ -10,8 +10,6 @@ import LoginButton from '../buttons/LoginButton';
 import { Subtitle, Text } from '../styles/StyledComponents';
 import { secondaryColor } from '../utils/DisplaySettings';
 import { trackPageView } from '../hooks/pageViewTracker';
-import NewUserListeningSurveyForm from '../components/NewUserListeningSurveyForm';
-
 const Home = () => {
     const showSoundCloudPlayer = false;
     const showLocalPlayer = false;
@@ -29,8 +27,6 @@ const Home = () => {
     };
 
     const [homeTutorialDismissed, setHomeTutorialDismissed] = useState(false);
-    const [showNewUserListeningSurvey, setShowNewUserListeningSurvey] = useState(false);
-
     // Music library state (from WelcomePlayerPage)
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
@@ -49,13 +45,6 @@ const Home = () => {
             }
         });
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-    useEffect(() => {
-        if (location.state?.showNewUserListeningSurvey) {
-            setShowNewUserListeningSurvey(true);
-            navigate(location.pathname, { replace: true, state: {} });
-        }
-    }, [location.state, location.pathname, navigate]);
 
     // Handle folder selection
     const handleFolderSelect = useCallback(async (event) => {
@@ -208,10 +197,6 @@ const Home = () => {
                 </Row>
             )}
 
-            <NewUserListeningSurveyForm
-                show={showNewUserListeningSurvey}
-                onHide={() => setShowNewUserListeningSurvey(false)}
-            />
         </Container>
     );
 }

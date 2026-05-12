@@ -36,6 +36,7 @@ import {
 import PlayPauseButton from '../../buttons/PlayPauseButton';
 import CloseButton from '../../buttons/CloseButton';
 import { trackButtonClick } from '../../hooks/simpleTracker';
+import { createReactionAnalyticsBatcher } from '../../reaction_analytics/reactionAnalyticsBatcher';
 
 /**
  * @param {{
@@ -169,6 +170,9 @@ const UnifiedSensingUserUI = ({
     const detectionInProgressRef = useRef(false);
     /** @type {React.MutableRefObject<object|null>} */
     const faceTimelineMergedRef = useRef(null);
+    /** @type {React.MutableRefObject<ReturnType<typeof createReactionAnalyticsBatcher>|null>} */
+    const reactionBatcherRef = useRef(null);
+    const scanRef = useRef(false);
 
     const isOverlayLayout = scan && !overlayDismissed;
 
@@ -187,6 +191,10 @@ const UnifiedSensingUserUI = ({
         }),
         []
     );
+
+    useEffect(() => {
+        scanRef.current = scan;
+    }, [scan]);
 
     useEffect(() => {
         if (!scan) {
@@ -503,6 +511,16 @@ const UnifiedSensingUserUI = ({
                 }),
             );
 
+            if (scanRef.current && reactionBatcherRef.current) {
+                reactionBatcherRef.current.tryPushSample({
+                    nowMs: Date.now(),
+                    faceReactions,
+                    faceLandmarks,
+                    leftHandLm,
+                    rightHandLm,
+                });
+            }
+
             drawComposite(
                 faceLandmarks,
                 faceReactions,
@@ -548,6 +566,10 @@ const UnifiedSensingUserUI = ({
         }
 
         if (wasScanning) {
+            if (reactionBatcherRef.current) {
+                void reactionBatcherRef.current.stop();
+                reactionBatcherRef.current = null;
+            }
             landmarkBuffer.current = [];
             handRaiseBuffer.current = [];
             faceTimelineMergedRef.current = null;
@@ -562,6 +584,10 @@ const UnifiedSensingUserUI = ({
         intervalIdRef.current = setInterval(() => {
             void runUnifiedFrame();
         }, unifiedScanMs);
+        reactionBatcherRef.current = createReactionAnalyticsBatcher({
+            sessionName: sessionName || getSessionNameFromUrl(),
+        });
+        reactionBatcherRef.current.start();
     };
 
     const handleRestoreOverlay = () => {
@@ -624,6 +650,10 @@ const UnifiedSensingUserUI = ({
                 } catch {
                     /* ignore */
                 }
+            }
+            if (reactionBatcherRef.current) {
+                void reactionBatcherRef.current.stop();
+                reactionBatcherRef.current = null;
             }
             hasLoaded.current = false;
             setScan(false);

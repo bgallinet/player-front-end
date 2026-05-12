@@ -240,7 +240,7 @@ const TestPlayerPage_20260504_BPM_energy = () => {
         [],
         ['Work/focus', 'Commute', 'Relaxation', 'Sport/light exercise', 'Social/background', 'Other'],
         [],
-        ['Mobile', 'Table', 'Laptop', 'Desktop'],
+        ['Mobile', 'Tablet', 'Laptop', 'Desktop'],
         ['Yes', 'No'],
     ];
     const initialSurveyScaleLabelTypes = [
@@ -285,7 +285,9 @@ const TestPlayerPage_20260504_BPM_energy = () => {
             ];
         }
         return [
-            'You now will hear the same music extracts in three different sequences.',
+            'You will hear three sequences. Each sequence will have a duration of 3 minutes and will play the same three songs, but differently.',
+            'At the end of each sequence, you will have to rate the songs and answer some further questions.',
+            'At the end of this test, you will be asked to rate the sequences.',
             ...modeSpecificPages,
             'Let us start with the first sequence. When you are ready, click on Play.',
         ];

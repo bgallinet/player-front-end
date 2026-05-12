@@ -2,6 +2,7 @@ import './index.css';
 import { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Navigation from './components/Navigation';
+import UserProfileModalHost from './components/UserProfileModalHost';
 import { AuthProvider } from './contexts/AuthContext';
 import { TutorialProvider } from './contexts/TutorialContext';
 import { SoundCloudAuthProvider } from './contexts/SoundCloudAuthContext';
@@ -26,6 +27,7 @@ const App = () => {
       <SoundCloudAuthProvider>
         <TutorialProvider>
           <Router>
+            <UserProfileModalHost />
             <Routes>
               <Route path="/" element={<><Navigation /><Home /></>} />
               <Route path="/landing" element={<Navigate to="/" replace />} />

@@ -70,7 +70,7 @@ const Form = ({
     disableSubmission = false,
     /** Optional map of question index → paragraph shown immediately after that question (non-submitted). */
     paragraphAfterQuestionIndex = null,
-    /** When true, submit via User API to `user_profiles.listening_profile` instead of analytics / evaluation_forms. */
+    /** When true, submit via User API (`user_request_type: listening_profile`) into `listening_profiles`. */
     persistListeningProfileToUserProfile = false,
 }) => {
     const [responses, setResponses] = useState({});
