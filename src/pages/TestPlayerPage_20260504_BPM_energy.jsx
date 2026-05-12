@@ -240,7 +240,7 @@ const TestPlayerPage_20260504_BPM_energy = () => {
         [],
         ['Work/focus', 'Commute', 'Relaxation', 'Sport/light exercise', 'Social/background', 'Other'],
         [],
-        ['Mobile', 'Table', 'Laptop', 'Desktop'],
+        ['Mobile', 'Tablet', 'Laptop', 'Desktop'],
         ['Yes', 'No'],
     ];
     const initialSurveyScaleLabelTypes = [

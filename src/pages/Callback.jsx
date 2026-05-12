@@ -34,7 +34,7 @@ export default function Callback() {
                 const { isNewUser } = await registerUserIfNeeded();
                 navigate('/', {
                     replace: true,
-                    state: isNewUser ? { showNewUserListeningSurvey: true } : {},
+                    state: isNewUser ? { showUserProfileForm: true } : {},
                 });
             } catch (error) {
                 console.error('Authentication error:', error);

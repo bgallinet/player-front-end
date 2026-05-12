@@ -1,9 +1,12 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import homeIcon from '../images/homeIcon.png';
+import profileIcon from '../images/profileIcon.png';
 import logo from '../images/logo.png';
 import { secondaryColor } from '../utils/DisplaySettings';
 import { Nav, Image, Dropdown } from 'react-bootstrap';
+import { useAuth } from '../contexts/AuthContext';
+import { openUserProfileForm } from './UserProfileModalHost';
 
 /**
  * Navigation Component
@@ -13,7 +16,7 @@ import { Nav, Image, Dropdown } from 'react-bootstrap';
  * 
  * Features:
  * - Responsive design that works on mobile and desktop
- * - Hover effects with box shadow animation
+ * - Nav items share the same flat styling (no link-button hover chrome on Profile)
  * - Consistent styling with the app's theme using secondaryColor
  * - Icon and text layout that adjusts based on screen size
  * 
@@ -28,6 +31,8 @@ import { Nav, Image, Dropdown } from 'react-bootstrap';
 
 
 function Navigation() {
+    const { idToken } = useAuth();
+
     // Render a link with a label and an icon
     const renderLink = (path, label, icon) => (
         <Link 
@@ -77,6 +82,43 @@ function Navigation() {
         </Link>
     );
 
+    const renderProfileButton = () => (
+        <button
+            type="button"
+            className="d-flex flex-column flex-md-row align-items-center text-white text-decoration-none"
+            style={{
+                whiteSpace: 'nowrap',
+                padding: '0.25rem',
+                flex: '0 1 auto',
+                minWidth: 0,
+                border: 'none',
+                background: 'transparent',
+                boxShadow: 'none',
+                cursor: 'pointer',
+            }}
+            onClick={() => openUserProfileForm()}
+        >
+            <Image
+                src={profileIcon}
+                alt="Profile"
+                className="mb-1 mb-md-0 me-md-2"
+                style={{
+                    width: 'clamp(2rem, 3.5vw, 3.5rem)',
+                    aspectRatio: '1/1',
+                }}
+            />
+            <span
+                className="text-center text-md-start"
+                style={{
+                    flex: '0 1 auto',
+                    fontSize: 'clamp(0.5rem, 1vw, 0.7rem)',
+                }}
+            >
+                Profile
+            </span>
+        </button>
+    );
+
     return (
         <>
             <Nav 
@@ -97,7 +139,7 @@ function Navigation() {
                 
                 <div className="d-flex flex-row align-items-center flex-grow-1 justify-content-between gap-2 gap-md-3 min-w-0 ms-lg-0">
                     {renderLink("/", "Home", homeIcon)}
-                    
+                    {idToken ? renderProfileButton() : null}
 
                     {/* Dropdown menu — always at far right on tablet / mobile */}
                     <Dropdown className="flex-shrink-0 ms-2">

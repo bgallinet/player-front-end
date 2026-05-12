@@ -320,6 +320,32 @@ const Player = ({
         return null;
     }, [loadedDeckATrack, selectedFile]);
 
+    const resolveActiveArtist = useCallback(() => {
+        const t = loadedDeckATrack || selectedFile;
+        if (!t) return '';
+        return (
+            t.artist ||
+            t.user?.username ||
+            t.user?.full_name ||
+            t.scTrack?.user?.username ||
+            t.scTrack?.user?.full_name ||
+            ''
+        );
+    }, [loadedDeckATrack, selectedFile]);
+
+    const resolveDeckBArtist = useCallback(() => {
+        const t = loadedDeckBTrack;
+        if (!t) return '';
+        return (
+            t.artist ||
+            t.user?.username ||
+            t.user?.full_name ||
+            t.scTrack?.user?.username ||
+            t.scTrack?.user?.full_name ||
+            ''
+        );
+    }, [loadedDeckBTrack]);
+
     const resolveActiveTrackBaseBpm = useCallback(() => {
         const candidates = [
             loadedDeckATrack?.bpm,
@@ -369,6 +395,8 @@ const Player = ({
                     command_type: commandType,
                     context: {
                         song_id: songId,
+                        song_name: resolveActiveTrackName(),
+                        song_artist: resolveActiveArtist(),
                         old_bpm: Number.isFinite(oldBpm) ? Number(oldBpm.toFixed(3)) : null,
                         new_bpm: Number.isFinite(newBpm) ? Number(newBpm.toFixed(3)) : null,
                     },
@@ -380,7 +408,14 @@ const Player = ({
             setCurrentRecommendation(recommendation);
             applyRecommendationToConsole(output);
         },
-        [applyRecommendationToConsole, playerSessionName, resolveActiveSongId, resolveActiveTrackBaseBpm],
+        [
+            applyRecommendationToConsole,
+            playerSessionName,
+            resolveActiveArtist,
+            resolveActiveSongId,
+            resolveActiveTrackBaseBpm,
+            resolveActiveTrackName,
+        ],
     );
 
     const noddingAmplitudeForDeckUi = Number(currentRecommendation?.noddingAmplitude) || 0;
@@ -594,7 +629,9 @@ const Player = ({
                             >
                                 <DeckControls
                                     deckId="A"
+                                    analyticsSessionName={playerSessionName}
                                     currentSongId={resolveActiveSongId()}
+                                    currentSongArtist={resolveActiveArtist()}
                                     onLoadTrack={handleLoadTrackToDeck}
                                     loadedTrackName={loadedDeckATrack?.displayName || selectedFile?.name || ''}
                                     isPlaying={deckATransport.isPlaying}
@@ -650,16 +687,20 @@ const Player = ({
                                 >
                                     <DeckControls
                                         deckId="B"
-                                        currentSongId={null}
+                                        analyticsSessionName={playerSessionName}
+                                        currentSongId={
+                                            loadedDeckBTrack?.songId ?? loadedDeckBTrack?.id ?? null
+                                        }
+                                        currentSongArtist={resolveDeckBArtist()}
                                         onLoadTrack={handleLoadTrackToDeck}
                                         loadedTrackName={loadedDeckBTrack?.displayName || ''}
-                                    isPlaying={deckBTransport.isPlaying}
-                                    currentTime={deckBTransport.currentTime}
-                                    duration={deckBTransport.duration}
+                                        isPlaying={deckBTransport.isPlaying}
+                                        currentTime={deckBTransport.currentTime}
+                                        duration={deckBTransport.duration}
                                         hasValidAudioSource={hasValidAudioSourceDeckB}
-                                    onPlayPause={deckBTransport.handlePlayPause}
-                                    onStop={deckBTransport.handleStop}
-                                    onProgressSeek={deckBTransport.handleProgressSeek}
+                                        onPlayPause={deckBTransport.handlePlayPause}
+                                        onStop={deckBTransport.handleStop}
+                                        onProgressSeek={deckBTransport.handleProgressSeek}
                                         hasPrevious={false}
                                         hasNext={false}
                                         iconSize="1.68rem"

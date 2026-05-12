@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, useMemo } from 'react';
 import { Spinner } from 'react-bootstrap';
 import { Text } from '../../styles/StyledComponents';
 import { secondaryColor } from '../../utils/DisplaySettings';
@@ -19,7 +19,9 @@ const falseFn = () => false;
 export const DeckControls = ({
     deckId,
     currentSongId = null,
+    currentSongArtist = '',
     loadedTrackName = '',
+    analyticsSessionName = 'default',
     isPlaying = false,
     currentTime = 0,
     duration = 0,
@@ -79,39 +81,74 @@ export const DeckControls = ({
         enabled: canPlay
     });
 
-    const trackDeckControlClick = useCallback((controlName, extra = {}) => {
-        const elementId = `deck_${deckId}_${controlName}_button`;
-        void trackButtonClick(elementId, window.location.href, {
-            deck_id: deckId,
-            control: controlName,
-            ...extra
-        });
-    }, [deckId]);
+    const trackDeckControlClick = useCallback(
+        (controlName, metadataFields = {}) => {
+            const elementId = `deck_${deckId}_${controlName}_button`;
+            const metadata = {
+                deck_id: deckId,
+                control: controlName,
+                ...metadataFields,
+            };
+            void trackButtonClick(elementId, window.location.href, {
+                session_name: analyticsSessionName,
+                metadata,
+            });
+        },
+        [deckId, analyticsSessionName]
+    );
+
+    const songMeta = useMemo(
+        () => ({
+            song_id:
+                currentSongId !== null && currentSongId !== undefined && currentSongId !== ''
+                    ? String(currentSongId)
+                    : '',
+            song_name: loadedTrackName || '',
+            song_artist: currentSongArtist || '',
+        }),
+        [currentSongId, loadedTrackName, currentSongArtist]
+    );
 
     const handlePlayPauseClick = useCallback(() => {
         const control = isPlaying ? 'pause' : 'play';
-        const metadata = { is_playing: isPlaying };
-        if (control === 'play' && currentSongId !== null && currentSongId !== undefined) {
-            metadata.song_id = currentSongId;
-        }
-        trackDeckControlClick(control, metadata);
+        trackDeckControlClick(control, {
+            ...songMeta,
+            was_playing: isPlaying,
+        });
         onPlayPause();
-    }, [isPlaying, onPlayPause, trackDeckControlClick, currentSongId]);
+    }, [isPlaying, onPlayPause, trackDeckControlClick, songMeta]);
 
     const handleStopClick = useCallback(() => {
-        trackDeckControlClick('stop', { is_playing: isPlaying });
+        trackDeckControlClick('stop', {
+            ...songMeta,
+            was_playing: isPlaying,
+        });
         onStop();
-    }, [isPlaying, onStop, trackDeckControlClick]);
+    }, [isPlaying, onStop, trackDeckControlClick, songMeta]);
 
     const handlePreviousClick = useCallback(() => {
-        trackDeckControlClick('previous', { has_previous: hasPrevious });
+        trackDeckControlClick('previous', {
+            previous_song_name: loadedTrackName || '',
+            previous_song_id:
+                currentSongId !== null && currentSongId !== undefined && currentSongId !== ''
+                    ? String(currentSongId)
+                    : '',
+            has_previous: hasPrevious,
+        });
         onPrevious();
-    }, [hasPrevious, onPrevious, trackDeckControlClick]);
+    }, [hasPrevious, onPrevious, trackDeckControlClick, loadedTrackName, currentSongId]);
 
     const handleNextClick = useCallback(() => {
-        trackDeckControlClick('next', { has_next: hasNext });
+        trackDeckControlClick('next', {
+            previous_song_name: loadedTrackName || '',
+            previous_song_id:
+                currentSongId !== null && currentSongId !== undefined && currentSongId !== ''
+                    ? String(currentSongId)
+                    : '',
+            has_next: hasNext,
+        });
         onNext();
-    }, [hasNext, onNext, trackDeckControlClick]);
+    }, [hasNext, onNext, trackDeckControlClick, loadedTrackName, currentSongId]);
 
     const handleAudioDeviceClick = useCallback(() => {
         trackDeckControlClick('audio_settings');
