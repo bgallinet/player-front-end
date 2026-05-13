@@ -1,4 +1,5 @@
 import { enrichAnalyticsRequestBody } from './clientEnvironment';
+import { mergeActiveExperimentIntoAnalyticsRequestBody } from './experimentSession';
 
 const APICall = async (requestBody, url) => {
     const idToken = localStorage.getItem('idToken');
@@ -16,7 +17,11 @@ const APICall = async (requestBody, url) => {
         
         
         const bodyToSend =
-            typeof requestBody === 'string' ? enrichAnalyticsRequestBody(requestBody) : requestBody;
+            typeof requestBody === 'string'
+                ? enrichAnalyticsRequestBody(
+                      mergeActiveExperimentIntoAnalyticsRequestBody(requestBody)
+                  )
+                : requestBody;
 
         const response = await fetch(url, {
             method: 'POST',

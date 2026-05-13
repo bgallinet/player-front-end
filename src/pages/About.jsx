@@ -11,7 +11,7 @@ const About = () => {
                         <h1 className="mb-4">About TuneTribes</h1>
                         
                         <p className="mb-4">
-                            <strong>Version:</strong> e8e9e554| <strong>Last updated:</strong> 2026-05-12</p>
+                            <strong>Version:</strong> 3bc44f2a| <strong>Last updated:</strong> 2026-05-13</p>
 
                         <p className="mb-4">
                             TuneTribes is an innovative real-time music streaming and audience engagement platform that combines cutting-edge emotion detection technology with interactive music experiences. Our platform enables creators and fans to connect through music with real-time facial expression analysis and dynamic audio processing.

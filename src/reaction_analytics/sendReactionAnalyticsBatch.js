@@ -5,12 +5,13 @@ import { createAuthenticatedRequestBody } from '../hooks/sessionUtils';
  * POST one reaction analytics batch via authenticated process-data → analytics handler.
  * @param {object} payload
  * @param {string} payload.session_name
- * @param {number} payload.unixTime - batch start (epoch seconds)
+ * @param {number} payload.unixTime - batch anchor (epoch seconds; second precision for DB / metadata)
+ * @param {number[]} [payload.sample_timestamps_ms] - per-sample epoch ms (same length as sample_count); analytics / CSV only
  * @param {number} payload.sample_rate_hz
  * @param {number} payload.sample_count
  * @param {number[]} payload.smiling
  * @param {number[]} payload.jaw_open
- * @param {number[][]} payload.landmark_vectors - five arrays, each flat [x,y,z,...] length sample_count*3
+ * @param {Record<string, number[]>} payload.landmark_series — keyed flat arrays [x,y,z,...] per MediaPipe index (POSE_0…, HAND_LEFT_0…, FACE_…); keys must match server allowlist
  */
 export async function sendReactionAnalyticsBatch(payload) {
     if (typeof window === 'undefined' || !localStorage.getItem('idToken')) {
