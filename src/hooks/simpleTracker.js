@@ -3,6 +3,7 @@ import UserAPI from '../utils/UserAPI';
 import { createAuthenticatedRequestBody } from './sessionUtils';
 import EnvironmentVariables from '../utils/EnvironmentVariables';
 import { enrichAnalyticsRequestBody } from '../utils/clientEnvironment';
+import { mergeActiveExperimentIntoAnalyticsRequestBody } from '../utils/experimentSession';
 
 /**
  * Simple event tracking utility without experiment dependencies
@@ -26,7 +27,8 @@ export const trackSimpleEvent = async (eventData) => {
         
         if (isAuthenticated) {
             const authenticatedBody = createAuthenticatedRequestBody(requestBody, true);
-            await UserAPI(JSON.stringify(authenticatedBody));
+            const merged = mergeActiveExperimentIntoAnalyticsRequestBody(authenticatedBody);
+            await UserAPI(JSON.stringify(merged));
         } else {
             await AnalyticsAPI(JSON.stringify(requestBody), false);
         }
@@ -61,8 +63,12 @@ export const trackSimpleEventOnUnload = (eventData) => {
             : EnvironmentVariables.AnalyticsAPI_URL;
 
         let body = isAuthenticated
-            ? JSON.stringify(createAuthenticatedRequestBody(requestBody, true))
-            : JSON.stringify(requestBody);
+            ? JSON.stringify(
+                  mergeActiveExperimentIntoAnalyticsRequestBody(
+                      createAuthenticatedRequestBody(requestBody, true)
+                  )
+              )
+            : JSON.stringify(mergeActiveExperimentIntoAnalyticsRequestBody(requestBody));
         body = enrichAnalyticsRequestBody(body);
 
         const headers = {

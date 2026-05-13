@@ -59,7 +59,7 @@ export const trackPageView = async (options = {}) => {
             referrer: referrer,
             viewport_width: viewportWidth,
             viewport_height: viewportHeight,
-            ...additionalData
+            ...additionalData,
         };
 
         const fingerprint = JSON.stringify({

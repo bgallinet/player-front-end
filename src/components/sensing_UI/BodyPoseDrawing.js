@@ -2,20 +2,24 @@ import { secondaryColor, primaryColor } from '../../utils/DisplaySettings';
 
 /** Canvas utilities for MediaPipe pose skeleton drawing (static methods on BodyPoseDrawing). */
 
-// MediaPipe Pose landmark connections for drawing skeleton
-const POSE_CONNECTIONS = [
-    // Face
+/** Simplified pose head (0–8 eyes/nose proxy, 9–10 mouth corners) — kept for `POSE_CONNECTIONS` / `getPoseConnections`, not drawn. */
+const POSE_FACE_CONNECTIONS = [
     [0, 1], [1, 2], [2, 3], [3, 7],
     [0, 4], [4, 5], [5, 6], [6, 8],
-    // Upper body
-    [9, 10], [11, 12], [11, 13], [13, 15], [15, 17], [15, 19], [15, 21], [17, 19],
+    [9, 10],
+];
+
+// MediaPipe Pose body connections (drawn). Full graph = face + body (see `POSE_CONNECTIONS`).
+const POSE_BODY_CONNECTIONS = [
+    [11, 12], [11, 13], [13, 15], [15, 17], [15, 19], [15, 21], [17, 19],
     [12, 14], [14, 16], [16, 18], [16, 20], [16, 22], [18, 20],
     [11, 23], [12, 24], [23, 24],
-    // Lower body
     [23, 25], [25, 27], [27, 29], [29, 31], [27, 31],
     [24, 26], [26, 28], [28, 30], [30, 32], [28, 32],
-    [25, 26]
+    [25, 26],
 ];
+
+const POSE_CONNECTIONS = [...POSE_FACE_CONNECTIONS, ...POSE_BODY_CONNECTIONS];
 
 /**
  * BodyPoseDrawing utility class
@@ -80,7 +84,7 @@ class BodyPoseDrawing {
     // Arms use primary color when hand is raised
     ctx.lineWidth = 6 * lineWidthMultiplier;
     
-    POSE_CONNECTIONS.forEach(([startIdx, endIdx]) => {
+    POSE_BODY_CONNECTIONS.forEach(([startIdx, endIdx]) => {
       if (landmarks[startIdx] && landmarks[endIdx] && 
           landmarks[startIdx].visibility > minVisibility && 
           landmarks[endIdx].visibility > minVisibility) {
@@ -257,7 +261,7 @@ class BodyPoseDrawing {
   }
 
   /**
-   * Get pose connection arrays for external use
+   * Full pose connection list (includes simplified head links 0–10; those are not drawn on canvas).
    */
   static getPoseConnections() {
     return POSE_CONNECTIONS;
@@ -266,5 +270,5 @@ class BodyPoseDrawing {
 
 // Export the class and connection arrays
 export default BodyPoseDrawing;
-export { POSE_CONNECTIONS };
+export { POSE_CONNECTIONS, POSE_FACE_CONNECTIONS, POSE_BODY_CONNECTIONS };
 

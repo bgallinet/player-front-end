@@ -1,4 +1,8 @@
-import { buildFiveLandmarkTriplets } from './landmarkFivePoints';
+import {
+    buildLandmarkSeriesSampleTriples,
+    emptyLandmarkSeriesBuffers,
+    REACTION_LANDMARK_KEY_ORDER,
+} from './reactionAnalyticsLandmarks';
 import { sendReactionAnalyticsBatch } from './sendReactionAnalyticsBatch';
 
 /** Target ingest rate for reaction analytics batches (Hz). */
@@ -13,17 +17,17 @@ function roundLandmarkCoord(value) {
     if (value == null || Number.isNaN(value)) return null;
     return Math.round(Number(value) * 1000) / 1000;
 }
-function emptyLandmarkSlotArrays() {
-    return [[], [], [], [], []];
-}
 
 /**
- * Buffers smiling, jaw_open, and five landmark XYZ series; flushes on interval or stop.
+ * Buffers smiling, jaw_open, and per–MediaPipe-index landmark triples; flushes on interval or stop.
  */
 export function createReactionAnalyticsBatcher({ sessionName }) {
     const smiling = [];
     const jawOpen = [];
-    const landmarkSlots = emptyLandmarkSlotArrays();
+    /** Per-sample wall time (epoch ms); only sent for analytics / landmark CSV stitching. */
+    const sampleTimestampsMs = [];
+    /** @type {Record<string, number[]>} */
+    const landmarkSeries = emptyLandmarkSeriesBuffers();
 
     let batchStartUnixMs = null;
     let lastSampleWallMs = 0;
@@ -32,29 +36,38 @@ export function createReactionAnalyticsBatcher({ sessionName }) {
     const clearBuffers = () => {
         smiling.length = 0;
         jawOpen.length = 0;
-        for (let i = 0; i < 5; i += 1) landmarkSlots[i].length = 0;
+        sampleTimestampsMs.length = 0;
+        for (const k of REACTION_LANDMARK_KEY_ORDER) {
+            landmarkSeries[k].length = 0;
+        }
         batchStartUnixMs = null;
     };
 
-    const buildLandmarkVectors = () => {
+    const buildLandmarkSeriesPayload = () => {
         const n = smiling.length;
         const expected = n * 3;
-        const out = [];
-        for (let i = 0; i < 5; i += 1) {
-            const slot = landmarkSlots[i];
+        /** @type {Record<string, number[]>} */
+        const out = {};
+        for (const k of REACTION_LANDMARK_KEY_ORDER) {
+            const slot = landmarkSeries[k];
             if (slot.length !== expected) {
                 return null;
             }
-            out.push([...slot]);
+            out[k] = [...slot];
         }
         return out;
     };
 
     const flush = async () => {
         if (smiling.length === 0) return;
-        const landmark_vectors = buildLandmarkVectors();
-        if (!landmark_vectors) {
-            console.warn('[reaction_analytics] landmark length mismatch, dropping batch');
+        const landmark_series = buildLandmarkSeriesPayload();
+        if (!landmark_series) {
+            console.warn('[reaction_analytics] landmark_series length mismatch, dropping batch');
+            clearBuffers();
+            return;
+        }
+        if (sampleTimestampsMs.length !== smiling.length) {
+            console.warn('[reaction_analytics] sample_timestamps_ms length mismatch, dropping batch');
             clearBuffers();
             return;
         }
@@ -71,7 +84,8 @@ export function createReactionAnalyticsBatcher({ sessionName }) {
             sample_count: smiling.length,
             smiling: [...smiling],
             jaw_open: [...jawOpen],
-            landmark_vectors,
+            landmark_series,
+            sample_timestamps_ms: [...sampleTimestampsMs],
         };
 
         clearBuffers();
@@ -85,8 +99,16 @@ export function createReactionAnalyticsBatcher({ sessionName }) {
      * @param {unknown[]|null} p.faceLandmarks
      * @param {unknown|null} p.leftHandLm
      * @param {unknown|null} p.rightHandLm
+     * @param {unknown[]|null} [p.poseLandmarks] — Holistic pose (33), optional
      */
-    const tryPushSample = ({ nowMs, faceReactions, faceLandmarks, leftHandLm, rightHandLm }) => {
+    const tryPushSample = ({
+        nowMs,
+        faceReactions,
+        faceLandmarks,
+        leftHandLm,
+        rightHandLm,
+        poseLandmarks = null,
+    }) => {
         if (!faceLandmarks || faceLandmarks.length === 0) return;
         if (nowMs - lastSampleWallMs < REACTION_SAMPLE_INTERVAL_MS) return;
         lastSampleWallMs = nowMs;
@@ -97,11 +119,21 @@ export function createReactionAnalyticsBatcher({ sessionName }) {
 
         smiling.push(faceReactions?.smiling ?? 0);
         jawOpen.push(faceReactions?.jawOpen ?? 0);
+        sampleTimestampsMs.push(Math.round(nowMs));
 
-        const triples = buildFiveLandmarkTriplets(faceLandmarks, leftHandLm, rightHandLm);
-        for (let i = 0; i < 5; i += 1) {
-            const [x, y, z] = triples[i];
-            landmarkSlots[i].push(roundLandmarkCoord(x), roundLandmarkCoord(y), roundLandmarkCoord(z));
+        const triples = buildLandmarkSeriesSampleTriples(
+            faceLandmarks,
+            leftHandLm,
+            rightHandLm,
+            poseLandmarks,
+        );
+        for (const k of REACTION_LANDMARK_KEY_ORDER) {
+            const [x, y, z] = triples[k];
+            landmarkSeries[k].push(
+                roundLandmarkCoord(x),
+                roundLandmarkCoord(y),
+                roundLandmarkCoord(z),
+            );
         }
     };
 

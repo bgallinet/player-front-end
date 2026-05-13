@@ -518,6 +518,7 @@ const UnifiedSensingUserUI = ({
                     faceLandmarks,
                     leftHandLm,
                     rightHandLm,
+                    poseLandmarks,
                 });
             }
 

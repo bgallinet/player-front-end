@@ -5,6 +5,7 @@ import UserAPI from '../utils/UserAPI.jsx';
 import { createAuthenticatedRequestBody } from '../hooks/sessionUtils.js';
 import { getSessionNameFromUrl } from '../hooks/sessionUtils.js';
 import { secondaryColor } from '../utils/DisplaySettings.jsx';
+import { buildAnalyticsFormMetadata } from '../utils/experimentSession';
 
 /**
  * Form
@@ -279,35 +280,8 @@ const Form = ({
                 });
             }
 
-            // Prepare analytics data - follow the same pattern as other analytics calls
-            const surveyIdOnlyMetadata =
-                formMetadata &&
-                typeof formMetadata === 'object' &&
-                Object.keys(formMetadata).length === 1 &&
-                Object.prototype.hasOwnProperty.call(formMetadata, 'survey_id');
-
-            const metadata = surveyIdOnlyMetadata
-                ? { survey_id: formMetadata.survey_id }
-                : formMetadata && typeof formMetadata === 'object'
-                    ? {
-                          ...(experimentId ? { experiment_id: experimentId } : {}),
-                          variant: formMetadata.variant ?? 'control',
-                          is_control:
-                              typeof formMetadata.is_control === 'boolean'
-                                  ? formMetadata.is_control
-                                  : true,
-                          experiment_config:
-                              formMetadata.experiment_config &&
-                              typeof formMetadata.experiment_config === 'object'
-                                  ? formMetadata.experiment_config
-                                  : {},
-                      }
-                    : {
-                          ...(experimentId ? { experiment_id: experimentId } : {}),
-                          variant: 'control',
-                          is_control: true,
-                          experiment_config: {},
-                      };
+            // Analytics metadata: single builder (evaluation + user_state); session layer may merge via experimentSession.
+            const metadata = buildAnalyticsFormMetadata(experimentId, formMetadata);
 
             const fallbackKind = 'evaluation';
             const normalizedKinds = questions.map((_, index) => {

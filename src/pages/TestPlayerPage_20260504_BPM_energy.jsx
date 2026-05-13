@@ -17,9 +17,14 @@ import {
 import EnvironmentVariables from '../utils/EnvironmentVariables';
 import { useAuth } from '../contexts/AuthContext';
 import { ANALYTICS_SESSION_OVERRIDE_KEY } from '../hooks/sessionUtils';
+import { activateExperiment, deactivateExperiment } from '../utils/experimentSession';
+import { fetchExperimentConfigFromAnalytics } from '../utils/fetchExperimentConfigFromAnalytics';
 
 const TEST_CLOUDFRONT_URL =
     process.env.REACT_APP_TEST_TRACKS_CDN_URL || 'https://dhuj2x4ippvty.cloudfront.net';
+
+/** DB `experiments.id` — must match `controlled_experiments.csv` */
+const EXPERIMENT_DB_ID = '20260504';
 
 export const adaptation_modes_sequence = ['Mode C', 'Mode B', 'Mode A'];
 
@@ -88,6 +93,7 @@ const TestPlayerPage_20260504_BPM_energy = () => {
     const currentAdaptationMode =
         randomizedAdaptationModesSequence[currentAdaptationModeIndex] ?? randomizedAdaptationModesSequence[0];
     console.log('[TestPlayerPage] chosen adaptation mode:', currentAdaptationMode);
+    const experimentId = EXPERIMENT_DB_ID;
     const initialReactionPolicyInstance = useMemo(
         () => buildReactionPolicyBundleForMode(currentAdaptationMode),
         [currentAdaptationMode]
@@ -97,9 +103,8 @@ const TestPlayerPage_20260504_BPM_energy = () => {
         [currentAdaptationMode]
     );
     const analyticsSessionName = 'test_20260504_BPM_energy';
-    const experimentId = '20260504_BPM_energy';
-    const BLOCK_TRACK_PLAY_SECONDS = 60;
-    const BLOCK_TRACK_IDS = [1, 4, 10];
+    const [sequenceConfig, setSequenceConfig] = useState(null);
+    const [sequenceConfigError, setSequenceConfigError] = useState('');
 
     useLayoutEffect(() => {
         try {
@@ -118,6 +123,48 @@ const TestPlayerPage_20260504_BPM_energy = () => {
             }
         };
     }, []);
+
+    useEffect(() => {
+        let cancelled = false;
+        void fetchExperimentConfigFromAnalytics(EXPERIMENT_DB_ID)
+            .then((cfg) => {
+                if (cancelled) return;
+                setSequenceConfig(cfg);
+                setSequenceConfigError('');
+            })
+            .catch((err) => {
+                if (cancelled) return;
+                console.error('[TestPlayerPage] experiment config:', err);
+                setSequenceConfig(null);
+                setSequenceConfigError(
+                    err?.message || 'Failed to load BPM experiment sequence from server',
+                );
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
+    useEffect(() => {
+        if (showInitialEnergySurvey) {
+            return undefined;
+        }
+        activateExperiment({
+            experimentId,
+            variant: currentExperimentMetadata.variant,
+            is_control: currentExperimentMetadata.is_control,
+            experiment_config: {},
+        });
+        return () => {
+            deactivateExperiment();
+        };
+    }, [
+        showInitialEnergySurvey,
+        experimentId,
+        currentAdaptationMode,
+        currentExperimentMetadata.variant,
+        currentExperimentMetadata.is_control,
+    ]);
 
     useEffect(() => {
         if (
@@ -256,6 +303,16 @@ const TestPlayerPage_20260504_BPM_energy = () => {
     ];
 
     const getSequenceTutorialMessages = (modeIndex, modeName) => {
+        const totalSequenceSeconds = (sequenceConfig?.durationSecondsByTrack ?? []).reduce(
+            (sum, sec) => {
+                const n = Number(sec);
+                return sum + (Number.isFinite(n) && n > 0 ? n : 0);
+            },
+            0,
+        );
+        const sequenceDurationSecondsLabel =
+            totalSequenceSeconds > 0 ? String(Math.floor(totalSequenceSeconds)) : '…';
+
         const modeSpecificPages = (() => {
             if (modeName === 'Mode C') {
                 return [
@@ -285,7 +342,7 @@ const TestPlayerPage_20260504_BPM_energy = () => {
             ];
         }
         return [
-            'You will hear three sequences. Each sequence will have a duration of 3 minutes and will play the same three songs, but differently.',
+            `You will hear three sequences. Each sequence will have a duration of ${sequenceDurationSecondsLabel} seconds and will play the same three songs, but differently.`,
             'At the end of each sequence, you will have to rate the songs and answer some further questions.',
             'At the end of this test, you will be asked to rate the sequences.',
             ...modeSpecificPages,
@@ -394,9 +451,9 @@ const TestPlayerPage_20260504_BPM_energy = () => {
                 console.log('[TestPlayerPage] raw tracks extracted:', rawTracks);
 
                 const rows = toPlaylistRows(rawTracks).sort((a, b) => {
-                    const aNum = Number(String(a.id).replace('test-seq-', ''));
-                    const bNum = Number(String(b.id).replace('test-seq-', ''));
-                    return aNum - bNum;
+                    const t = String(a.title || '').localeCompare(String(b.title || ''));
+                    if (t !== 0) return t;
+                    return String(a.songId || '').localeCompare(String(b.songId || ''));
                 });
                 console.log('[TestPlayerPage] playlist rows normalized:', rows);
                 if (isCancelled) return;
@@ -430,8 +487,9 @@ const TestPlayerPage_20260504_BPM_energy = () => {
     }, [idToken]);
 
     const prepareSequenceStart = () => {
-        const firstTrackId = BLOCK_TRACK_IDS[0];
-        const firstTrack = playlist.find((track) => Number(track?.songId) === Number(firstTrackId));
+        const ids = sequenceConfig?.trackIds;
+        const firstTrackId = ids?.[0];
+        const firstTrack = playlist.find((track) => String(track?.songId) === String(firstTrackId));
         if (!firstTrack?.url) return;
         blockTrackStepRef.current = 0;
         const firstTrackIndex = playlist.findIndex((track) => track?.id === firstTrack.id);
@@ -477,9 +535,12 @@ const TestPlayerPage_20260504_BPM_energy = () => {
 
     const scheduleNextTrackTransition = () => {
         clearBlockTrackTimer();
+        const step = blockTrackStepRef.current;
+        const durations = sequenceConfig?.durationSecondsByTrack ?? [];
+        const seconds = durations[step] ?? 60;
         blockTrackTimerRef.current = setTimeout(() => {
             playNextTrackInBlock();
-        }, BLOCK_TRACK_PLAY_SECONDS * 1000);
+        }, seconds * 1000);
     };
 
     const playTrackByIndex = (index) => {
@@ -528,7 +589,8 @@ const TestPlayerPage_20260504_BPM_energy = () => {
 
     const playNextTrackInBlock = () => {
         const nextStep = blockTrackStepRef.current + 1;
-        if (nextStep >= BLOCK_TRACK_IDS.length) {
+        const blockIds = sequenceConfig?.trackIds ?? [];
+        if (nextStep >= blockIds.length) {
             clearBlockTrackTimer();
             if (audioRef.current) {
                 audioRef.current.pause();
@@ -537,8 +599,8 @@ const TestPlayerPage_20260504_BPM_energy = () => {
             setShowAfterBlockSurvey(true);
             return;
         }
-        const nextTrackId = BLOCK_TRACK_IDS[nextStep];
-        const nextTrack = playlist.find((track) => Number(track?.songId) === Number(nextTrackId));
+        const nextTrackId = blockIds[nextStep];
+        const nextTrack = playlist.find((track) => String(track?.songId) === String(nextTrackId));
         const nextTrackIndex = playlist.findIndex((track) => track?.id === nextTrack?.id);
         if (!nextTrack?.url) {
             clearBlockTrackTimer();
@@ -579,6 +641,11 @@ const TestPlayerPage_20260504_BPM_energy = () => {
                             {tracksLoadError && (
                                 <div className="text-danger w-100 mb-2">
                                     {tracksLoadError}
+                                </div>
+                            )}
+                            {sequenceConfigError && (
+                                <div className="text-danger w-100 mb-2">
+                                    {sequenceConfigError}
                                 </div>
                             )}
                             <Button

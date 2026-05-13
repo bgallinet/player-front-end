@@ -148,7 +148,7 @@ const Player = ({
                     session_name: playerSessionName,
                     has_camera: !!stream,
                     has_selected_file: !!selectedFile,
-                }
+                },
             });
         }
     }, []);
