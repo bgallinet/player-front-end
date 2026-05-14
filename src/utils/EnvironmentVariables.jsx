@@ -24,6 +24,7 @@ const generateCodeChallenge = async (verifier) => {
         .replace(/=/g, '');
 };
 
+
 // Test environment configuration
 const ClientID = '48mbuimag81pc52odtsight2g5';
 const RedirectURI = 'https://test.d22r3tk88qmw9i.amplifyapp.com/callback';
