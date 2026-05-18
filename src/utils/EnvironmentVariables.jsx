@@ -1,58 +1,53 @@
-// API Gateway URL - using custom domain for stable endpoint
-const API_gateway_url = "https://rgiesci0s7.execute-api.eu-west-3.amazonaws.com/player-test-stage-dsafun3r";
-const environment_flag = "test"
+//Powershell command for getting the API gateway URL:
+// aws apigateway get-rest-apis --query "items[*].[id,name]" --output text | ForEach-Object { $parts = $_ -split '\s+'; $apiId = $parts[0]; $apiName = $parts[1]; $stages = aws apigateway get-stages --rest-api-id $apiId --query "item[*].stageName" --output text; $stages -split '\s+' | ForEach-Object { Write-Output "$apiName - https://$apiId.execute-api.us-east-1.amazonaws.com/$_" } }
 
-// WebSocket URLs
-const WebSocketURL = "ws-test.crowd-sensor.com"; // Domain endpoint (HTTPS pages → wss://)
-const WebSocketTestURL = "crowd-sensor-test-websocket-alb-293139646.eu-west-3.elb.amazonaws.com"; // ALB direct URL (HTTP pages → ws://)
+const API_gateway_url = "https://s70no2w5sg.execute-api.eu-west-3.amazonaws.com/player-dev-stage-hjkl1qok"; // To be changed
 
-// PKCE helper functions for prod and test environments
-const generateCodeVerifier = () => {
-    const array = new Uint8Array(32);
-    crypto.getRandomValues(array);
-    return btoa(String.fromCharCode(...array))
-        .replace(/\+/g, '-')
-        .replace(/\//g, '_')
-        .replace(/=/g, '');
+
+// WebSocket URLs (without protocol - will be auto-detected based on page protocol)
+const WebSocketURL = "ws-player-dev.crowd-sensor.com"; // Domain endpoint (HTTPS pages → wss://)
+const WebSocketTestURL = "ws://player-dev-websocket-alb-383665997.eu-west-3.elb.amazonaws.com"; // ALB direct URL (HTTP pages → ws://)
+
+const environment_flag = "dev"
+
+// Dynamically detect protocol (http or https) based on current page
+const getCurrentProtocol = () => {
+    if (typeof window !== 'undefined') {
+        return window.location.protocol; // 'http:' or 'https:'
+    }
+    return 'http:'; // Default fallback
 };
 
-const generateCodeChallenge = async (verifier) => {
-    const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
-    return btoa(String.fromCharCode(...new Uint8Array(hash)))
-        .replace(/\+/g, '-')
-        .replace(/\//g, '_')
-        .replace(/=/g, '');
+const getCurrentHost = () => {
+    if (typeof window !== 'undefined') {
+        return window.location.host; // 'localhost:3000' or whatever
+    }
+    return 'localhost:3000'; // Default fallback
 };
 
+// Build redirect URI dynamically based on current page protocol
+const RedirectURI = `${getCurrentProtocol()}//${getCurrentHost()}/callback`;
 
-// Test environment configuration
-const ClientID = '48mbuimag81pc52odtsight2g5';
-const RedirectURI = 'https://test.d22r3tk88qmw9i.amplifyapp.com/callback';
+// Build AuthURL with dynamically detected redirect URI
+const AuthURL = `https://d3o5hrtbl653it.auth.eu-west-3.amazoncognito.com/oauth2/authorize?client_id=3ng1jhbo6oemarms0uc9mhadak&response_type=code&scope=email+openid&redirect_uri=${encodeURIComponent(RedirectURI)}`;
 
-// AuthURL with PKCE for test (confidential client) - WITHOUT empty code_challenge
-const AuthURL = `https://d3o5hrtbl653it.auth.eu-west-3.amazoncognito.com/oauth2/authorize?client_id=${ClientID}&response_type=code&scope=email+openid&redirect_uri=${encodeURIComponent(RedirectURI)}&code_challenge_method=S256`;
+const CognitoURL = 'https://d3o5hrtbl653it.auth.eu-west-3.amazoncognito.com/oauth2/token';
 
-const CognitoURL = 'https://d3o5hrtbl653it.auth.eu-west-3.amazoncognito.com/oauth2/token'
+const ClientID = '3ng1jhbo6oemarms0uc9mhadak';
 
-
-// SoundCloud API credentials loaded from environment variables (never committed)
-// Set REACT_APP_SC_CLIENT_ID and REACT_APP_SC_CLIENT_SECRET in the build environment
+// SoundCloud API credentials loaded from .env.local (gitignored, never committed)
+// Create web-app-front-end/.env.local with:
+//   REACT_APP_SC_CLIENT_ID=your_client_id
+//   REACT_APP_SC_CLIENT_SECRET=your_client_secret
 const SC_ClientID = process.env.REACT_APP_SC_CLIENT_ID || '';
 const SC_ClientSecret = process.env.REACT_APP_SC_CLIENT_SECRET || '';
 
-// Cognito app client secret (never commit). Amplify: set both names at app level if you like; this file picks by environment_flag:
-//   test → REACT_APP_COGNITO_CLIENT_SECRET_TEST (or REACT_APP_COGNITO_CLIENT_SECRET)
-//   prod → REACT_APP_COGNITO_CLIENT_SECRET_PROD (or REACT_APP_COGNITO_CLIENT_SECRET)
-const CognitoClientSecret = (() => {
-    const generic = (process.env.REACT_APP_COGNITO_CLIENT_SECRET || '').trim();
-    if (environment_flag === 'prod') {
-        return (process.env.REACT_APP_COGNITO_CLIENT_SECRET_PROD || generic).trim();
-    }
-    if (environment_flag === 'test') {
-        return (process.env.REACT_APP_COGNITO_CLIENT_SECRET_TEST || generic).trim();
-    }
-    return '';
-})();
+// Spotify API credentials loaded from .env.local (gitignored, never committed)
+// Create web-app-front-end/.env.local with:
+//   REACT_APP_SPOTIFY_CLIENT_ID=your_client_id
+//   REACT_APP_SPOTIFY_CLIENT_SECRET=your_client_secret  (optional for PKCE public client)
+const SP_ClientID = process.env.REACT_APP_SPOTIFY_CLIENT_ID || '';
+const SP_ClientSecret = process.env.REACT_APP_SPOTIFY_CLIENT_SECRET || '';
 
 const EnvironmentVariables = {
     AuthURL: AuthURL,
@@ -64,16 +59,15 @@ const EnvironmentVariables = {
     RedirectURI: RedirectURI,
     CognitoURL: CognitoURL,
     ClientID: ClientID,
-    CognitoClientSecret: CognitoClientSecret,
     environment_flag: environment_flag,
-    generateCodeVerifier: generateCodeVerifier,
-    generateCodeChallenge: generateCodeChallenge,
     SC_ClientID: SC_ClientID,
     SC_ClientSecret: SC_ClientSecret,
+    SP_ClientID: SP_ClientID,
+    SP_ClientSecret: SP_ClientSecret,
 };
 
 export default EnvironmentVariables;
 
 // Export individual values for convenience
 export const AnalyticsAPI_URL = EnvironmentVariables.AnalyticsAPI_URL;
-export { WebSocketURL, WebSocketTestURL };
+export { WebSocketURL, WebSocketTestURL }; // Re-export WebSocket URLs

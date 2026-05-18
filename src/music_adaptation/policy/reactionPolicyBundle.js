@@ -13,6 +13,7 @@
  * @property {Record<string, unknown>} [delayMappings]
  * @property {Record<string, unknown>} [keyShiftMappings]
  * @property {Record<string, unknown>} [bpmShiftMappings]
+ * @property {Record<string, unknown>} [simplifyBpmKeyShiftMappings]
  * @property {number} [thumbTempoStepBpm]
  * @property {import('./declarativeReactionRules').DeclarativeReactionRule[]} [declarativeRules]
  */
@@ -33,6 +34,7 @@ export function normalizeReactionPolicyBundle(raw) {
         delayMappings: shallowMappingCopy(r.delayMappings),
         keyShiftMappings: shallowMappingCopy(r.keyShiftMappings),
         bpmShiftMappings: shallowMappingCopy(r.bpmShiftMappings),
+        simplifyBpmKeyShiftMappings: shallowMappingCopy(r.simplifyBpmKeyShiftMappings),
         thumbTempoStepBpm: Number.isFinite(Number(r.thumbTempoStepBpm))
             ? Number(r.thumbTempoStepBpm)
             : undefined,

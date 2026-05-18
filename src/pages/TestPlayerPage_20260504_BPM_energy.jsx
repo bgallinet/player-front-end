@@ -4,19 +4,11 @@ import Player from '../components/player/Player';
 import Forms from '../components/Form';
 import TutorialMessage from '../components/TutorialMessage';
 import magicPlayerImage from '../images/logo_small.png';
-import {
-    createReactionMappingTestBPMEnergyModeABundle,
-} from '../music_adaptation/policy/fixed_mappings/reactionMappingTestBPMEnergy.v1.ModeA';
-import {
-    createReactionMappingTestBPMEnergyModeBBundle,
-    fetchLatestEnergySurveyFromUserEndpoint,
-} from '../music_adaptation/policy/fixed_mappings/reactionMappingTestBPMEnergy.v1.ModeB';
-import {
-    createReactionMappingTestBPMEnergyModeCBundle,
-} from '../music_adaptation/policy/fixed_mappings/reactionMappingTestBPMEnergy.v1.ModeC';
+import { fetchLatestEnergySurveyFromUserEndpoint } from '../music_adaptation/policy/serverDeclarativeRules';
 import EnvironmentVariables from '../utils/EnvironmentVariables';
 import { useAuth } from '../contexts/AuthContext';
 import { ANALYTICS_SESSION_OVERRIDE_KEY } from '../hooks/sessionUtils';
+import { useAdaptationPolicy } from '../hooks/useAdaptationPolicy';
 import { activateExperiment, deactivateExperiment } from '../utils/experimentSession';
 import { fetchExperimentConfigFromAnalytics } from '../utils/fetchExperimentConfigFromAnalytics';
 
@@ -39,13 +31,6 @@ export function randomizeAdaptationModesSequence(sequence = adaptation_modes_seq
         [randomized[i], randomized[j]] = [randomized[j], randomized[i]];
     }
     return randomized;
-}
-
-function buildReactionPolicyBundleForMode(modeName) {
-    if (modeName === 'Mode A') return createReactionMappingTestBPMEnergyModeABundle();
-    if (modeName === 'Mode B') return createReactionMappingTestBPMEnergyModeBBundle();
-    if (modeName === 'Mode C') return createReactionMappingTestBPMEnergyModeCBundle();
-    return createReactionMappingTestBPMEnergyModeABundle();
 }
 
 function buildExperimentMetadataForMode(modeName) {
@@ -85,7 +70,6 @@ const TestPlayerPage_20260504_BPM_energy = () => {
     const blockTrackTimerRef = useRef(null);
     const blockTrackStepRef = useRef(0);
     const isAutoSwitchingTrackRef = useRef(false);
-    const hasShownFirstSequenceTutorialRef = useRef(false);
     const randomizedAdaptationModesSequence = useMemo(
         () => randomizeAdaptationModesSequence(adaptation_modes_sequence),
         []
@@ -94,10 +78,16 @@ const TestPlayerPage_20260504_BPM_energy = () => {
         randomizedAdaptationModesSequence[currentAdaptationModeIndex] ?? randomizedAdaptationModesSequence[0];
     console.log('[TestPlayerPage] chosen adaptation mode:', currentAdaptationMode);
     const experimentId = EXPERIMENT_DB_ID;
-    const initialReactionPolicyInstance = useMemo(
-        () => buildReactionPolicyBundleForMode(currentAdaptationMode),
-        [currentAdaptationMode]
-    );
+    const {
+        policyInstance: reactionPolicyInstance,
+        loading: policyLoading,
+        error: policyLoadError,
+    } = useAdaptationPolicy({
+        experimentId: EXPERIMENT_DB_ID,
+        variantId: currentAdaptationMode,
+        idToken,
+        enabled: !showInitialEnergySurvey,
+    });
     const currentExperimentMetadata = useMemo(
         () => buildExperimentMetadataForMode(currentAdaptationMode),
         [currentAdaptationMode]
@@ -165,18 +155,6 @@ const TestPlayerPage_20260504_BPM_energy = () => {
         currentExperimentMetadata.variant,
         currentExperimentMetadata.is_control,
     ]);
-
-    useEffect(() => {
-        if (
-            !showInitialEnergySurvey &&
-            currentAdaptationModeIndex === 0 &&
-            !showSequenceTutorial &&
-            !hasShownFirstSequenceTutorialRef.current
-        ) {
-            hasShownFirstSequenceTutorialRef.current = true;
-            setShowSequenceTutorial(true);
-        }
-    }, [showInitialEnergySurvey, currentAdaptationModeIndex, showSequenceTutorial]);
 
     useEffect(() => {
         if (showInitialEnergySurvey) return;
@@ -616,13 +594,16 @@ const TestPlayerPage_20260504_BPM_energy = () => {
 
     return (
         <>
-            {!showInitialEnergySurvey && (
+            {!showInitialEnergySurvey && policyLoading && (
+                <div className="text-center text-light py-5">Loading adaptation policy…</div>
+            )}
+            {!showInitialEnergySurvey && !policyLoading && reactionPolicyInstance && (
                 <Player
-                    key={`sequence-mode-${currentAdaptationModeIndex}`}
+                    key={`sequence-mode-${currentAdaptationModeIndex}-${reactionPolicyInstance.policyId || 'policy'}`}
                     selectedFile={selectedFile}
                     pageName="test-player"
                     audioRef={audioRef}
-                    initialReactionPolicyInstance={initialReactionPolicyInstance}
+                    initialReactionPolicyInstance={reactionPolicyInstance}
                     playlist={playlist}
                     currentTrackIndex={currentTrackIndex}
                     onTrackSelect={handleTestSequenceTrackSelect}
@@ -646,6 +627,11 @@ const TestPlayerPage_20260504_BPM_energy = () => {
                             {sequenceConfigError && (
                                 <div className="text-danger w-100 mb-2">
                                     {sequenceConfigError}
+                                </div>
+                            )}
+                            {policyLoadError && (
+                                <div className="text-warning w-100 mb-2">
+                                    Policy fallback (server): {policyLoadError}
                                 </div>
                             )}
                             <Button
@@ -715,7 +701,6 @@ const TestPlayerPage_20260504_BPM_energy = () => {
                         adaptation_modes_sequence.length - 1
                     );
                     setCurrentAdaptationModeIndex(nextModeIndex);
-                    setShowSequenceTutorial(true);
                 }}
                 disableSubmission={false}
             />
@@ -742,7 +727,7 @@ const TestPlayerPage_20260504_BPM_energy = () => {
                 <TutorialMessage
                     messages={getSequenceTutorialMessages(currentAdaptationModeIndex, currentAdaptationMode)}
                     position="top-center"
-                    forceShow={true}
+                    forceShow
                     onClose={() => {
                         setShowSequenceTutorial(false);
                         prepareSequenceStart();

@@ -42,7 +42,8 @@
  */
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { guess } from 'web-audio-beat-detector';
+import { detectBpmFromAudioUrl, TRACK_BPM_ANALYZE_MAX_SECONDS } from '../../utils/detectBpmFromUrl';
+import { TRACK_BPM_DETECTED_EVENT } from '../../utils/spotifyBpm';
 import { Button, Form } from 'react-bootstrap';
 import { Subtitle, Text } from '../../styles/StyledComponents';
 import { secondaryColor, thresholdForVisualizationOfNodding } from '../../utils/DisplaySettings';
@@ -66,9 +67,6 @@ import {
     BPM_KEY_SHIFT_PERCENT_MIN,
     BPM_KEY_SHIFT_PERCENT_MAX,
 } from './audioEffects';
-
-/** Upper bound on decoded audio used for tempo estimation (seconds). */
-const TRACK_BPM_ANALYZE_MAX_SECONDS = 45;
 
 const SoundConsole = ({
     audioRef,
@@ -717,18 +715,9 @@ const SoundConsole = ({
             setTrackBpmPending(true);
 
             (async () => {
-                const decodeCtx = new Ctor();
                 try {
-                    const res = await fetch(url, { mode: 'cors', credentials: 'omit', cache: 'force-cache' });
-                    if (!res.ok) throw new Error('bpm fetch');
-                    const raw = await res.arrayBuffer();
-                    const buffer = await decodeCtx.decodeAudioData(raw.slice(0));
+                    const rounded = await detectBpmFromAudioUrl(url);
                     if (gen !== trackBpmGenRef.current) return;
-                    const dur = Math.min(TRACK_BPM_ANALYZE_MAX_SECONDS, buffer.duration || 0);
-                    if (dur < 1) throw new Error('buffer too short');
-                    const { bpm } = await guess(buffer, 0, dur);
-                    if (gen !== trackBpmGenRef.current) return;
-                    const rounded = Number.isFinite(bpm) ? Math.round(bpm) : null;
                     setTrackBpm(rounded);
                     if (rounded != null) {
                         lastSuccessfulBpmUrlRef.current = url;
@@ -742,7 +731,6 @@ const SoundConsole = ({
                         setTrackBpm(null);
                     }
                 } finally {
-                    decodeCtx.close().catch(() => {});
                     if (gen === trackBpmGenRef.current) {
                         bpmPendingForUrlRef.current = null;
                         setTrackBpmPending(false);
@@ -766,6 +754,16 @@ const SoundConsole = ({
             setTrackBpmPending(false);
         };
 
+        const onExternalBpm = (e) => {
+            const bpm = Number(e?.detail?.bpm);
+            if (!Number.isFinite(bpm) || bpm <= 0) return;
+            lastSuccessfulBpmUrlRef.current = '__external__';
+            bpmPendingForUrlRef.current = null;
+            setTrackBpmPending(false);
+            setTrackBpm(bpm);
+            syncDetectedTrackBpm(bpm);
+        };
+
         const attach = () => {
             if (cancelled) return;
             const node = audioRef.current;
@@ -776,8 +774,13 @@ const SoundConsole = ({
             el = node;
             el.addEventListener('loadeddata', onLoadedData);
             el.addEventListener('emptied', onEmptied);
+            el.addEventListener(TRACK_BPM_DETECTED_EVENT, onExternalBpm);
             if (el.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
                 onLoadedData();
+            }
+            const existing = Number(node.detectedTrackBpm);
+            if (Number.isFinite(existing) && existing > 0) {
+                onExternalBpm({ detail: { bpm: existing } });
             }
         };
 
@@ -790,6 +793,7 @@ const SoundConsole = ({
             if (el) {
                 el.removeEventListener('loadeddata', onLoadedData);
                 el.removeEventListener('emptied', onEmptied);
+                el.removeEventListener(TRACK_BPM_DETECTED_EVENT, onExternalBpm);
             }
         };
     }, [audioRef]);
@@ -852,7 +856,9 @@ const SoundConsole = ({
         }
         const semitones = Number(currentRecommendation.keyShiftSemitones);
         const bpmPct = Number(currentRecommendation.bpmShiftPercent);
-        const bpmKeyPct = Number(currentRecommendation.bpmKeyShiftPercent);
+        const bpmKeyPct = Number(
+            currentRecommendation.simplifyBpmKeyShift ?? currentRecommendation.bpmKeyShiftPercent,
+        );
         handleKeyShiftChange(Number.isFinite(semitones) ? semitones : 0);
         handleBpmShiftChange(Number.isFinite(bpmPct) ? bpmPct : 0);
         handleBpmKeyShiftChange(Number.isFinite(bpmKeyPct) ? bpmKeyPct : 0);

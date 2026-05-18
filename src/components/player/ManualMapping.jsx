@@ -41,11 +41,11 @@ import {
 import {
     resolveKeyShiftForPlaybackProfile as resolveKeyShiftSemitonesForEmotion,
     resolveVolumeMultiplierForPlaybackProfile as resolveVolumeMultiplierForEmotion,
-} from '../../music_adaptation/policy/fixed_mappings/reactionMappingDefaults.v1';
+} from '../../music_adaptation/policy/mappingDefaults.v1';
 import {
     REACTION_PLAYBACK_PROFILE_UI_ROWS,
     REACTION_PLAYBACK_PROFILE,
-} from '../../music_adaptation/policy/fixed_mappings/reactionPlaybackProfiles.v1';
+} from '../../music_adaptation/policy/playbackProfiles.v1';
 import {
     BPM_SHIFT_PERCENT_MIN,
     BPM_SHIFT_PERCENT_MAX
@@ -82,7 +82,7 @@ const ManualMapping = ({
     showEmotionMappings,
     onToggleEmotionMappings
 }) => {
-    const [selectedEmotion, setSelectedEmotion] = useState(REACTION_PLAYBACK_PROFILE.NODDING_HAPPY);
+    const [selectedEmotion, setSelectedEmotion] = useState(REACTION_PLAYBACK_PROFILE.NODDING_SMILING);
 
     const emotionStates = REACTION_PLAYBACK_PROFILE_UI_ROWS.map((row) => ({
         key: row.id,

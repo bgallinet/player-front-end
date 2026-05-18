@@ -31,7 +31,8 @@ const PlaylistCard = ({
     onPlaylistChange, 
     currentTrackIndex, 
     onTrackSelect,
-    isPlaying 
+    isPlaying,
+    spotifyAccessToken,
 }) => {
     const [draggedItem, setDraggedItem] = useState(null);
     const [dragOverIndex, setDragOverIndex] = useState(null);
@@ -46,6 +47,21 @@ const PlaylistCard = ({
         const seconds = Math.floor(duration % 60);
         return `${minutes}:${seconds.toString().padStart(2, '0')}`;
     }, []);
+
+    const formatTrackSubtitle = useCallback(
+        (track) => {
+            const parts = [formatDuration(track.duration)];
+            if (!spotifyAccessToken) return parts.join('');
+
+            if (track.bpmPending) {
+                parts.push('BPM …');
+            } else if (Number(track.bpm) > 0) {
+                parts.push(`${track.bpm} BPM`);
+            }
+            return parts.join(' · ');
+        },
+        [formatDuration, spotifyAccessToken],
+    );
 
     // Handle drag start
     const handleDragStart = useCallback((e, track, index) => {
@@ -403,7 +419,7 @@ const PlaylistCard = ({
                                 fontSize: '0.7rem', 
                                 opacity: 0.7 
                             }}>
-                                {formatDuration(track.duration)}
+                                {formatTrackSubtitle(track)}
                             </Text>
                         </div>
                         
@@ -417,7 +433,7 @@ const PlaylistCard = ({
                                 🎵
                             </div>
                         )}
-                        
+
                         {/* Remove Button */}
                         <Button
                             variant="outline-light"

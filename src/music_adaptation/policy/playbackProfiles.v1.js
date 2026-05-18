@@ -1,15 +1,15 @@
 /**
- * Canonical playback profiles — one stable id per mutually exclusive sensing→audio regime.
- * Nothing here concatenates cues at runtime; the compiler picks exactly one profile id via {@link deriveReactionPlaybackProfile}.
+ * Client-side playback profile arbitration (sensing → profile id).
+ * Policy *tables* come from the server bundle; this module only picks which row applies.
  */
 
-import { THRESHOLD_NODDING } from '../../../hooks/ReactionMapperConfig';
+import { THRESHOLD_NODDING } from '../ReactionMapperConfig';
 
 /** Dominant face tone from vision channels (before nod/gesture arbitration). */
 export const DOMINANT_FACE_TONE = Object.freeze({
     NEUTRAL: 'neutral',
-    HAPPY: 'happy',
-    MOUTH_OPEN: 'mouthOpen',
+    SMILING: 'smiling',
+    JAW_OPEN: 'jawOpen',
 });
 
 /**
@@ -17,23 +17,22 @@ export const DOMINANT_FACE_TONE = Object.freeze({
  * @readonly
  */
 export const REACTION_PLAYBACK_PROFILE = Object.freeze({
-    NODDING_HAPPY: 'reaction.profile.v1.nodding_happy',
-    NODDING_MOUTH_OPEN: 'reaction.profile.v1.nodding_mouth_open',
+    NODDING_SMILING: 'reaction.profile.v1.nodding_smiling',
+    NODDING_JAW_OPEN: 'reaction.profile.v1.nodding_jawOpen',
     NODDING_NEUTRAL: 'reaction.profile.v1.nodding_neutral',
     THUMB_DOWN_HANDS_RAISED: 'reaction.profile.v1.thumb_down_hands_raised',
     THUMB_UP_HANDS_RAISED: 'reaction.profile.v1.thumb_up_hands_raised',
     HANDS_RAISED: 'reaction.profile.v1.hands_raised',
     THUMB_DOWN: 'reaction.profile.v1.thumb_down',
     THUMB_UP: 'reaction.profile.v1.thumb_up',
-    HAPPY: 'reaction.profile.v1.happy',
-    MOUTH_OPEN: 'reaction.profile.v1.mouth_open',
+    SMILING: 'reaction.profile.v1.smiling',
+    JAW_OPEN: 'reaction.profile.v1.jawOpen',
     NEUTRAL: 'reaction.profile.v1.neutral',
 });
 
-/** Profiles whose volume multiplier is modulated by nodding amplitude in SoundConsole. */
 export const NODDING_VOLUME_PLAYBACK_PROFILES = new Set([
-    REACTION_PLAYBACK_PROFILE.NODDING_HAPPY,
-    REACTION_PLAYBACK_PROFILE.NODDING_MOUTH_OPEN,
+    REACTION_PLAYBACK_PROFILE.NODDING_SMILING,
+    REACTION_PLAYBACK_PROFILE.NODDING_JAW_OPEN,
     REACTION_PLAYBACK_PROFILE.NODDING_NEUTRAL,
 ]);
 
@@ -41,34 +40,20 @@ export function playbackProfileUsesNoddingVolume(profileId) {
     return NODDING_VOLUME_PLAYBACK_PROFILES.has(profileId);
 }
 
-/** UI row order / labels — keys are {@link REACTION_PLAYBACK_PROFILE} values. */
 export const REACTION_PLAYBACK_PROFILE_UI_ROWS = Object.freeze([
-    { id: REACTION_PLAYBACK_PROFILE.NODDING_HAPPY, label: 'Nodding + Smiling' },
-    { id: REACTION_PLAYBACK_PROFILE.NODDING_MOUTH_OPEN, label: 'Nodding + Mouth open' },
+    { id: REACTION_PLAYBACK_PROFILE.NODDING_SMILING, label: 'Nodding + Smiling' },
+    { id: REACTION_PLAYBACK_PROFILE.NODDING_JAW_OPEN, label: 'Nodding + Jaw open' },
     { id: REACTION_PLAYBACK_PROFILE.NODDING_NEUTRAL, label: 'Nodding + Neutral' },
     { id: REACTION_PLAYBACK_PROFILE.THUMB_UP, label: 'Thumb up' },
     { id: REACTION_PLAYBACK_PROFILE.THUMB_DOWN, label: 'Thumb down' },
     { id: REACTION_PLAYBACK_PROFILE.THUMB_UP_HANDS_RAISED, label: 'Thumb up + Hands raised' },
     { id: REACTION_PLAYBACK_PROFILE.THUMB_DOWN_HANDS_RAISED, label: 'Thumb down + Hands raised' },
     { id: REACTION_PLAYBACK_PROFILE.HANDS_RAISED, label: 'Hands raised' },
-    { id: REACTION_PLAYBACK_PROFILE.HAPPY, label: 'Smiling' },
-    { id: REACTION_PLAYBACK_PROFILE.MOUTH_OPEN, label: 'Mouth open' },
+    { id: REACTION_PLAYBACK_PROFILE.SMILING, label: 'Smiling' },
+    { id: REACTION_PLAYBACK_PROFILE.JAW_OPEN, label: 'Jaw open' },
     { id: REACTION_PLAYBACK_PROFILE.NEUTRAL, label: 'Neutral' },
 ]);
 
-/**
- * Arbitration order: gestures / hands → thumbs → nodding + face tone → face-only.
- * Returns one {@link REACTION_PLAYBACK_PROFILE} id or null.
- *
- * @param {{
- *   dominantFaceTone: string | null,
- *   noddingAmplitude: number,
- *   handsRaised: boolean,
- *   thumbUpActive: boolean,
- *   thumbDownActive: boolean,
- * }} args
- * @returns {string|null}
- */
 export function deriveReactionPlaybackProfile(args) {
     const { dominantFaceTone, noddingAmplitude, handsRaised, thumbUpActive, thumbDownActive } = args;
 
@@ -87,12 +72,12 @@ export function deriveReactionPlaybackProfile(args) {
     if (!dominantFaceTone) return null;
 
     if (nod) {
-        if (dominantFaceTone === DOMINANT_FACE_TONE.HAPPY) return REACTION_PLAYBACK_PROFILE.NODDING_HAPPY;
-        if (dominantFaceTone === DOMINANT_FACE_TONE.MOUTH_OPEN) return REACTION_PLAYBACK_PROFILE.NODDING_MOUTH_OPEN;
+        if (dominantFaceTone === DOMINANT_FACE_TONE.SMILING) return REACTION_PLAYBACK_PROFILE.NODDING_SMILING;
+        if (dominantFaceTone === DOMINANT_FACE_TONE.JAW_OPEN) return REACTION_PLAYBACK_PROFILE.NODDING_JAW_OPEN;
         return REACTION_PLAYBACK_PROFILE.NODDING_NEUTRAL;
     }
 
-    if (dominantFaceTone === DOMINANT_FACE_TONE.HAPPY) return REACTION_PLAYBACK_PROFILE.HAPPY;
-    if (dominantFaceTone === DOMINANT_FACE_TONE.MOUTH_OPEN) return REACTION_PLAYBACK_PROFILE.MOUTH_OPEN;
+    if (dominantFaceTone === DOMINANT_FACE_TONE.SMILING) return REACTION_PLAYBACK_PROFILE.SMILING;
+    if (dominantFaceTone === DOMINANT_FACE_TONE.JAW_OPEN) return REACTION_PLAYBACK_PROFILE.JAW_OPEN;
     return REACTION_PLAYBACK_PROFILE.NEUTRAL;
 }

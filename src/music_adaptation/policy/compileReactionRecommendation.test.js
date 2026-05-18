@@ -6,11 +6,11 @@ import {
     DEFAULT_RHYTHMIC_ENHANCEMENT_MAPPINGS,
     DEFAULT_VOLUME_MAPPINGS,
     DEFAULT_BPM_SHIFT_MAPPINGS,
-} from './reactionMappingDefaults.v1';
+} from './mappingDefaults.v1';
 import { CueRingBuffer } from '../timeline/CueRingBuffer';
 import { compileReactionRecommendation } from './compileReactionRecommendation';
 import { DECLARATIVE_RULES_TEST_PACK_V1 } from './declarativeReactionRules';
-import { REACTION_PLAYBACK_PROFILE } from './reactionPlaybackProfiles.v1';
+import { REACTION_PLAYBACK_PROFILE } from './playbackProfiles.v1';
 
 const mappingBundle = (override = {}) => ({
     eqMappings: DEFAULT_EQ_MAPPINGS,
@@ -24,7 +24,7 @@ const mappingBundle = (override = {}) => ({
 });
 
 describe('compileReactionRecommendation', () => {
-    test('baseline thumb up uses mapping table key shift (+2 default)', () => {
+    test('baseline thumb up uses mapping table key shift', () => {
         const buf = new CueRingBuffer({ retentionMs: 60000 });
         const ref = { current: null };
         const rec = compileReactionRecommendation({
@@ -45,7 +45,7 @@ describe('compileReactionRecommendation', () => {
         expect(rec).not.toBeNull();
         expect(rec.emotionState).toBe(REACTION_PLAYBACK_PROFILE.THUMB_UP);
         expect(rec.playbackProfile).toBe(REACTION_PLAYBACK_PROFILE.THUMB_UP);
-        expect(rec.keyShiftSemitones).toBe(2);
+        expect(rec.keyShiftSemitones).toBe(0);
         expect(rec.appliedDeclarativeRules).toEqual([]);
     });
 

@@ -2,16 +2,17 @@
  * Build the SoundConsole recommendation row from one playback profile + user mapping tables.
  */
 
-import { resolveEqVector, EQ_PRESETS } from './fixed_mappings/eqPresetVectors.v1';
+import { resolveEqVector, EQ_PRESETS } from './eqPresetVectors.v1';
 import {
     resolveVolumeMultiplierForPlaybackProfile,
     resolveKeyShiftForPlaybackProfile,
+    resolveSimplifyBpmKeyShiftForPlaybackProfile,
     DEFAULT_RHYTHMIC_ENHANCEMENT_MAPPINGS,
     DEFAULT_REVERB_MAPPINGS,
     DEFAULT_DELAY_MAPPINGS,
     DEFAULT_BPM_SHIFT_MAPPINGS,
-} from './fixed_mappings/reactionMappingDefaults.v1';
-import { playbackProfileUsesNoddingVolume } from './fixed_mappings/reactionPlaybackProfiles.v1';
+} from './mappingDefaults.v1';
+import { playbackProfileUsesNoddingVolume } from './playbackProfiles.v1';
 
 /**
  * @param {{
@@ -30,6 +31,7 @@ import { playbackProfileUsesNoddingVolume } from './fixed_mappings/reactionPlayb
  *   delayMappings: Record<string, unknown>,
  *   keyShiftMappings: Record<string, unknown>,
  *   bpmShiftMappings: Record<string, unknown>,
+ *   simplifyBpmKeyShiftMappings?: Record<string, unknown>,
  *   nodBpmShiftPercentOverride?: number | null,
  *   meanNodFrequencyHz?: number,
  * }} args
@@ -51,6 +53,7 @@ export function buildBaselineRecommendation(args) {
         delayMappings,
         keyShiftMappings,
         bpmShiftMappings,
+        simplifyBpmKeyShiftMappings = {},
         nodBpmShiftPercentOverride = null,
         meanNodFrequencyHz,
     } = args;
@@ -70,6 +73,10 @@ export function buildBaselineRecommendation(args) {
             ? nodBpmShiftPercentOverride
             : mappedBpmShift;
     const bpmShiftPercent = bpmShiftPercentRaw;
+    const simplifyBpmKeyShift = resolveSimplifyBpmKeyShiftForPlaybackProfile(
+        simplifyBpmKeyShiftMappings,
+        playbackProfile,
+    );
 
     const eqPresetKeyword = Array.isArray(eqMapping)
         ? Object.keys(EQ_PRESETS).find((key) => JSON.stringify(EQ_PRESETS[key]) === JSON.stringify(eqVector)) ||
@@ -100,7 +107,8 @@ export function buildBaselineRecommendation(args) {
         delayAmount,
         keyShiftSemitones,
         bpmShiftPercent,
-        bpmKeyShiftPercent: 0,
+        simplifyBpmKeyShift,
+        bpmKeyShiftPercent: simplifyBpmKeyShift,
         meanNodFrequencyHz:
             typeof meanNodFrequencyHz === 'number' && Number.isFinite(meanNodFrequencyHz)
                 ? meanNodFrequencyHz

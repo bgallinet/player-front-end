@@ -1,6 +1,5 @@
 /**
  * Named EQ curves (6-band dB offsets) and resolution for policy `eqMappings` cells.
- * Values may be stored as vectors or preset keywords — {@link resolveEqVector} feeds the compiler / audio graph.
  */
 
 export const EQ_PRESETS = Object.freeze({
@@ -16,10 +15,7 @@ export const EQ_PRESETS = Object.freeze({
     'mouth-open': [0, 0, -14, -15, -15, -12],
 });
 
-/**
- * @param {number[]|string} eqMapping
- * @returns {number[]}
- */
+/** @param {number[]|string} eqMapping @returns {number[]} */
 export function resolveEqVector(eqMapping) {
     if (Array.isArray(eqMapping) && eqMapping.length === 6) {
         return eqMapping;

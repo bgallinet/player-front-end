@@ -22,7 +22,7 @@ import UnifiedSensingUserUI from '../sensing_UI/UnifiedSensingUserUI';
 
 /** Named exports — EQ presets live under `music_adaptation/policy`. */
 
-export { EQ_PRESETS, resolveEqVector } from '../../music_adaptation/policy/fixed_mappings/eqPresetVectors.v1';
+export { EQ_PRESETS, resolveEqVector } from '../../music_adaptation/policy/eqPresetVectors.v1';
 
 export {
     DEFAULT_EQ_MAPPINGS,
@@ -34,19 +34,19 @@ export {
     DEFAULT_BPM_SHIFT_MAPPINGS,
     resolveVolumeMultiplierForPlaybackProfile,
     resolveKeyShiftForPlaybackProfile,
-} from '../../music_adaptation/policy/fixed_mappings/reactionMappingDefaults.v1';
+} from '../../music_adaptation/policy/mappingDefaults.v1';
 
 export {
     resolveVolumeMultiplierForPlaybackProfile as resolveVolumeMultiplierForEmotion,
     resolveKeyShiftForPlaybackProfile as resolveKeyShiftSemitonesForEmotion,
-} from '../../music_adaptation/policy/fixed_mappings/reactionMappingDefaults.v1';
+} from '../../music_adaptation/policy/mappingDefaults.v1';
 
 export {
     REACTION_PLAYBACK_PROFILE,
     REACTION_PLAYBACK_PROFILE_UI_ROWS,
     DOMINANT_FACE_TONE,
     playbackProfileUsesNoddingVolume,
-} from '../../music_adaptation/policy/fixed_mappings/reactionPlaybackProfiles.v1';
+} from '../../music_adaptation/policy/playbackProfiles.v1';
 
 export {
     createBuiltinStaticReactionPolicyInstance,

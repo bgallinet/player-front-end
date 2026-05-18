@@ -12,6 +12,7 @@ import { secondaryColor } from '../utils/DisplaySettings';
 import { trackPageView } from '../hooks/pageViewTracker';
 const Home = () => {
     const showSoundCloudPlayer = false;
+    const showSpotifyPlayer = true;
     const showLocalPlayer = false;
 
     const urlParams = new URLSearchParams(window.location.search);
@@ -124,7 +125,7 @@ const Home = () => {
                                         size="lg"
                                         style={{ minWidth: '250px', padding: '1rem 2rem' }}
                                     >
-                                        Test player
+                                        Start Test
                                     </Button>
                                     {showSoundCloudPlayer && (
                                         <Button
@@ -139,6 +140,21 @@ const Home = () => {
                                             }}
                                         >
                                             SoundCloud
+                                        </Button>
+                                    )}
+                                    {showSpotifyPlayer && (
+                                        <Button
+                                            variant="outline-light"
+                                            onClick={() => navigate('/spotifyplayer')}
+                                            size="lg"
+                                            style={{
+                                                borderColor: '#1DB954',
+                                                color: '#1DB954',
+                                                minWidth: '250px',
+                                                padding: '1rem 2rem'
+                                            }}
+                                        >
+                                            Spotify
                                         </Button>
                                     )}
                                     {showLocalPlayer && (
