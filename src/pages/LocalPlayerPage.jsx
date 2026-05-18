@@ -3,13 +3,11 @@ import { Image } from 'react-bootstrap';
 import { Subtitle, StyledCard } from '../styles/StyledComponents';
 import ExpandReduceButton from '../buttons/ExpandReduceButton';
 import Player from '../components/player/Player';
-import TutorialMessage from '../components/TutorialMessage';
 import PlaylistCard from '../components/library_panels/PlaylistCard';
 import MusicLibraryPanel from '../components/library_panels/MusicLibraryPanel';
 import magicPlayerImage from '../images/logo_small.png';
 
 const LocalPlayerPage = () => {
-    const [showLocalPlayerTutorial, setShowLocalPlayerTutorial] = useState(true);
     const [selectedFile, setSelectedFile] = useState(null);
     const [playlist, setPlaylist] = useState([]);
     const [currentTrackIndex, setCurrentTrackIndex] = useState(-1);
@@ -155,17 +153,6 @@ const LocalPlayerPage = () => {
 
     return (
         <>
-            {showLocalPlayerTutorial && (
-                <TutorialMessage
-                    messages={[
-                        'Welcome to the local player. Load tracks from your music library and start playback.',
-                        'Use play controls, sensing, and sound console to shape the listening experience.',
-                    ]}
-                    position="top-center"
-                    forceShow={true}
-                    onClose={() => setShowLocalPlayerTutorial(false)}
-                />
-            )}
             <Player
                 selectedFile={selectedFile}
                 pageName="local-player"
@@ -175,8 +162,6 @@ const LocalPlayerPage = () => {
                 onPlaylistChange={handlePlaylistChange}
                 onTrackSelect={handlePlaylistTrackSelect}
                 fallbackDeckArtworkSrc={magicPlayerImage}
-                showTutorialButton={true}
-                onTutorialButtonClick={() => setShowLocalPlayerTutorial(true)}
             >
                 {/* Welcome Image - Only show when no file is selected */}
                 {!selectedFile && (

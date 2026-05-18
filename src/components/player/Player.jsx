@@ -31,6 +31,7 @@ function resolvePlayerSessionName(pageName) {
     if (pageName === 'test-player') return 'TestPlayer_20260504_BPM_energy';
     if (pageName === 'local-player') return 'LocalPlayer';
     if (pageName === 'soundcloud-player') return 'SoundCloudPlayer';
+    if (pageName === 'spotify-player') return 'SpotifyPlayer';
     return pageName || 'Player';
 }
 
@@ -329,6 +330,7 @@ const Player = ({
             t.user?.full_name ||
             t.scTrack?.user?.username ||
             t.scTrack?.user?.full_name ||
+            t.spTrack?.artists?.map((a) => a.name).join(', ') ||
             ''
         );
     }, [loadedDeckATrack, selectedFile]);
@@ -342,6 +344,7 @@ const Player = ({
             t.user?.full_name ||
             t.scTrack?.user?.username ||
             t.scTrack?.user?.full_name ||
+            t.spTrack?.artists?.map((a) => a.name).join(', ') ||
             ''
         );
     }, [loadedDeckBTrack]);

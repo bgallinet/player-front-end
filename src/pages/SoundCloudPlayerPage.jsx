@@ -5,14 +5,12 @@ import { Subtitle, StyledCard, Text } from '../styles/StyledComponents';
 import { secondaryColor } from '../utils/DisplaySettings';
 import ExpandReduceButton from '../buttons/ExpandReduceButton';
 import Player from '../components/player/Player';
-import TutorialMessage from '../components/TutorialMessage';
 import PlaylistCard from '../components/library_panels/PlaylistCard';
 import SoundCloudLibraryPanel from '../components/library_panels/SoundCloudLibraryPanel';
 import { useSoundCloudAuth } from '../contexts/SoundCloudAuthContext';
 import { getStreamUrl } from '../utils/soundcloudService';
 
 const SoundCloudPlayerPage = () => {
-    const [showSoundCloudTutorial, setShowSoundCloudTutorial] = useState(true);
     const {
         accessToken,
         user,
@@ -290,17 +288,6 @@ const SoundCloudPlayerPage = () => {
     // Authenticated player view
     return (
         <>
-            {showSoundCloudTutorial && (
-                <TutorialMessage
-                    messages={[
-                        'Welcome to the SoundCloud player. Connect your account and load tracks or playlists.',
-                        'Use playback controls, sensing, and sound console to adapt your SoundCloud listening session.',
-                    ]}
-                    position="top-center"
-                    forceShow={true}
-                    onClose={() => setShowSoundCloudTutorial(false)}
-                />
-            )}
             <Player
                 selectedFile={selectedFile}
                 pageName="soundcloud-player"
@@ -314,8 +301,6 @@ const SoundCloudPlayerPage = () => {
                 deckATrackStatusMessage={selectedFile && streamLoading ? 'Loading stream...' : undefined}
                 deckATrackStatusLoading={Boolean(selectedFile && streamLoading)}
                 autoStartLandmarkWithMusic
-                showTutorialButton={true}
-                onTutorialButtonClick={() => setShowSoundCloudTutorial(true)}
             >
             {/* Playlist Card — always visible (empty state inside card) */}
             <PlaylistCard

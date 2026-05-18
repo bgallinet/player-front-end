@@ -8,12 +8,12 @@ import {
     THRESHOLD_SMILING,
     THRESHOLD_SMILING_LOW,
 } from '../ReactionMapperConfig';
-import { DOMINANT_FACE_TONE } from './fixed_mappings/reactionPlaybackProfiles.v1';
+import { DOMINANT_FACE_TONE } from './playbackProfiles.v1';
 
 /**
  * @param {Record<string, number>} meanWindowChannels keyed by cue schema ids
  * @param {string | null | undefined} previousDominantFaceTone for hysteresis
- * @returns {'happy'|'mouthOpen'|'neutral'}
+ * @returns {'smiling'|'jawOpen'|'neutral'}
  */
 export function analyzeDominantFaceToneFromChannelMeans(meanWindowChannels, previousDominantFaceTone) {
     const avgSmiling = Number(meanWindowChannels['vision.face.smiling']) || 0;
@@ -21,25 +21,25 @@ export function analyzeDominantFaceToneFromChannelMeans(meanWindowChannels, prev
 
     const currentEmotion = previousDominantFaceTone;
 
-    const shouldSwitchToHappy = avgSmiling > THRESHOLD_SMILING;
-    const shouldSwitchToMouthOpen = avgJawOpen > THRESHOLD_JAW_OPEN;
+    const shouldSwitchToSmiling = avgSmiling > THRESHOLD_SMILING;
+    const shouldSwitchToJawOpen = avgJawOpen > THRESHOLD_JAW_OPEN;
 
-    const shouldSwitchAwayFromHappy =
-        currentEmotion === DOMINANT_FACE_TONE.HAPPY && avgSmiling < THRESHOLD_SMILING_LOW;
-    const shouldSwitchAwayFromMouthOpen =
-        currentEmotion === DOMINANT_FACE_TONE.MOUTH_OPEN && avgJawOpen < THRESHOLD_JAW_OPEN_LOW;
+    const shouldSwitchAwayFromSmiling =
+        currentEmotion === DOMINANT_FACE_TONE.SMILING && avgSmiling < THRESHOLD_SMILING_LOW;
+    const shouldSwitchAwayFromJawOpen =
+        currentEmotion === DOMINANT_FACE_TONE.JAW_OPEN && avgJawOpen < THRESHOLD_JAW_OPEN_LOW;
 
-    /** @type {'happy'|'mouthOpen'|'neutral'} */
+    /** @type {'smiling'|'jawOpen'|'neutral'} */
     let dominant = DOMINANT_FACE_TONE.NEUTRAL;
 
-    if (shouldSwitchToHappy && !shouldSwitchAwayFromHappy) {
-        dominant = DOMINANT_FACE_TONE.HAPPY;
-    } else if (shouldSwitchToMouthOpen && !shouldSwitchAwayFromMouthOpen) {
-        dominant = DOMINANT_FACE_TONE.MOUTH_OPEN;
-    } else if (currentEmotion === DOMINANT_FACE_TONE.HAPPY && !shouldSwitchAwayFromHappy) {
-        dominant = DOMINANT_FACE_TONE.HAPPY;
-    } else if (currentEmotion === DOMINANT_FACE_TONE.MOUTH_OPEN && !shouldSwitchAwayFromMouthOpen) {
-        dominant = DOMINANT_FACE_TONE.MOUTH_OPEN;
+    if (shouldSwitchToSmiling && !shouldSwitchAwayFromSmiling) {
+        dominant = DOMINANT_FACE_TONE.SMILING;
+    } else if (shouldSwitchToJawOpen && !shouldSwitchAwayFromJawOpen) {
+        dominant = DOMINANT_FACE_TONE.JAW_OPEN;
+    } else if (currentEmotion === DOMINANT_FACE_TONE.SMILING && !shouldSwitchAwayFromSmiling) {
+        dominant = DOMINANT_FACE_TONE.SMILING;
+    } else if (currentEmotion === DOMINANT_FACE_TONE.JAW_OPEN && !shouldSwitchAwayFromJawOpen) {
+        dominant = DOMINANT_FACE_TONE.JAW_OPEN;
     }
 
     return dominant;

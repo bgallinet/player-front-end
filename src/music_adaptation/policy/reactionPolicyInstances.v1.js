@@ -15,7 +15,7 @@ import {
     DEFAULT_DELAY_MAPPINGS,
     DEFAULT_KEY_SHIFT_MAPPINGS,
     DEFAULT_BPM_SHIFT_MAPPINGS,
-} from './fixed_mappings/reactionMappingDefaults.v1';
+} from './mappingDefaults.v1';
 
 /**
  * @typedef {import('./reactionPolicyBundle').ReactionPolicyBundleSnapshot & {
@@ -27,6 +27,7 @@ import {
 /** Origin of this snapshot — extend when dynamic producers ship (e.g. model inference). */
 export const REACTION_POLICY_PRODUCER_KIND = Object.freeze({
     STATIC_BUILTIN_V1: 'static_builtin_v1',
+    SERVER_CATALOG_V1: 'server_catalog_v1',
 });
 
 export const REACTION_POLICY_INSTANCE_SCHEMA_V1 = 'reaction.policy.instance.v1';

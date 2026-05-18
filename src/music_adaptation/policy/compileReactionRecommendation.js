@@ -24,9 +24,10 @@ import {
     deriveReactionPlaybackProfile,
     DOMINANT_FACE_TONE,
     REACTION_PLAYBACK_PROFILE,
-} from './fixed_mappings/reactionPlaybackProfiles.v1';
+} from './playbackProfiles.v1';
 import { buildBaselineRecommendation } from './baselineRecommendation';
 import { mergeDeclarativeRules, getDeclarativeRulesRuntime } from './declarativeReactionRules';
+import { resolveDeclarativeRulesFromBundle } from './serverDeclarativeRules';
 
 function finiteTs(ts) {
     const n = typeof ts === 'number' ? ts : parseFloat(ts);
@@ -109,7 +110,7 @@ export function compileReactionRecommendation(args) {
     } = args;
 
     const pb = normalizeReactionPolicyBundle(policyBundle);
-    const declarativeRules = pb.declarativeRules ?? getDeclarativeRulesRuntime();
+    const declarativeRules = resolveDeclarativeRulesFromBundle(pb);
     const thumbTempoStepBpm = Number.isFinite(Number(pb.thumbTempoStepBpm))
         ? Number(pb.thumbTempoStepBpm)
         : 3;
@@ -210,6 +211,7 @@ export function compileReactionRecommendation(args) {
         delayMappings: pb.delayMappings,
         keyShiftMappings: pb.keyShiftMappings,
         bpmShiftMappings: pb.bpmShiftMappings,
+        simplifyBpmKeyShiftMappings: pb.simplifyBpmKeyShiftMappings,
         nodBpmShiftPercentOverride,
         meanNodFrequencyHz: meanNodHz,
     });
