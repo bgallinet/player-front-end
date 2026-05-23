@@ -9,7 +9,7 @@ import {
     noddingAnalysisWindow,
     secondaryColor,
     thresholdForVisualizationOfNodding,
-} from '../../utils/DisplaySettings.jsx';
+} from '../../utils/DisplaySettings';
 import { getSessionNameFromUrl } from '../../hooks/sessionUtils.js';
 import { HolisticLandmarker, GestureRecognizer, FilesetResolver } from '@mediapipe/tasks-vision';
 import BodyPoseDrawing from './BodyPoseDrawing';
@@ -131,6 +131,7 @@ const UnifiedSensingUserUI = ({
     showDetectionToggle = false,
     autoStartLandmarkTick = 0,
     forceStopDetectionTick = 0,
+    enableSensingOverlayOnScan = true,
     onSensingFeedFrame,
 }) => {
     const onSensingFeedFrameRef = useRef(onSensingFeedFrame);
@@ -174,7 +175,7 @@ const UnifiedSensingUserUI = ({
     const reactionBatcherRef = useRef(null);
     const scanRef = useRef(false);
 
-    const isOverlayLayout = scan && !overlayDismissed;
+    const isOverlayLayout = enableSensingOverlayOnScan && scan && !overlayDismissed;
 
     const cameraSize = useMemo(() => {
         if (isOverlayLayout) {

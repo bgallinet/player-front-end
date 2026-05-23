@@ -1,16 +1,19 @@
-import React, { useState, useRef, useEffect, useMemo, useLayoutEffect } from 'react';
-import { Button } from 'react-bootstrap';
+import React, { useState, useRef, useEffect, useMemo, useLayoutEffect, useCallback } from 'react';
 import Player from '../components/player/Player';
 import Forms from '../components/Form';
 import TutorialMessage from '../components/TutorialMessage';
-import magicPlayerImage from '../images/logo_small.png';
 import { fetchLatestEnergySurveyFromUserEndpoint } from '../music_adaptation/policy/serverDeclarativeRules';
-import EnvironmentVariables from '../utils/EnvironmentVariables';
+import EnvironmentVariables from '../EnvironmentVariables';
 import { useAuth } from '../contexts/AuthContext';
 import { ANALYTICS_SESSION_OVERRIDE_KEY } from '../hooks/sessionUtils';
-import { useAdaptationPolicy } from '../hooks/useAdaptationPolicy';
+import { useAdaptationPolicy } from '../music_adaptation/hooks/useAdaptationPolicy';
 import { activateExperiment, deactivateExperiment } from '../utils/experimentSession';
-import { fetchExperimentConfigFromAnalytics } from '../utils/fetchExperimentConfigFromAnalytics';
+import {
+    buildSequencePlaylist,
+    fetchExperimentConfigFromAnalytics,
+} from '../utils/fetchExperimentConfigFromAnalytics';
+import ModeCThumbTempoOverrideButtons from '../components/test_player/ModeCThumbTempoOverrideButtons';
+import { trackSimpleEvent } from '../hooks/simpleTracker';
 
 const TEST_CLOUDFRONT_URL =
     process.env.REACT_APP_TEST_TRACKS_CDN_URL || 'https://dhuj2x4ippvty.cloudfront.net';
@@ -54,7 +57,7 @@ function loadAudioElementSource(audioEl, url, options = {}) {
     audioEl.load();
 }
 
-const TestPlayerPage_20260504_BPM_energy = () => {
+const TestPlayerPage_20260504 = () => {
     const { idToken } = useAuth();
     const [showInitialEnergySurvey, setShowInitialEnergySurvey] = useState(true);
     const [selectedFile, setSelectedFile] = useState(null);
@@ -67,13 +70,16 @@ const TestPlayerPage_20260504_BPM_energy = () => {
     const [tracksLoadError, setTracksLoadError] = useState('');
     const [currentAdaptationModeIndex, setCurrentAdaptationModeIndex] = useState(0);
     const audioRef = useRef(null);
+    const thumbBpmControlRef = useRef(null);
     const blockTrackTimerRef = useRef(null);
     const blockTrackStepRef = useRef(0);
     const isAutoSwitchingTrackRef = useRef(false);
-    const randomizedAdaptationModesSequence = useMemo(
-        () => randomizeAdaptationModesSequence(adaptation_modes_sequence),
-        []
-    );
+    // TODO: restore random mode order — temporarily fixed C → B → A
+    const randomizedAdaptationModesSequence = adaptation_modes_sequence;
+    // const randomizedAdaptationModesSequence = useMemo(
+    //     () => randomizeAdaptationModesSequence(adaptation_modes_sequence),
+    //     []
+    // );
     const currentAdaptationMode =
         randomizedAdaptationModesSequence[currentAdaptationModeIndex] ?? randomizedAdaptationModesSequence[0];
     console.log('[TestPlayerPage] chosen adaptation mode:', currentAdaptationMode);
@@ -92,9 +98,34 @@ const TestPlayerPage_20260504_BPM_energy = () => {
         () => buildExperimentMetadataForMode(currentAdaptationMode),
         [currentAdaptationMode]
     );
-    const analyticsSessionName = 'test_20260504_BPM_energy';
+    const analyticsSessionName = 'test_20260504';
+
+    const handleModeCTempoStep = useCallback(
+        (direction) => {
+            const commandType = direction === 'up' ? 'thumbs_up' : 'thumbs_down';
+            void trackSimpleEvent({
+                interaction_type: commandType,
+                element_id: direction === 'up' ? 'mode_c_tempo_up_button' : 'mode_c_tempo_down_button',
+                session_name: analyticsSessionName,
+                page_url: window.location.href,
+                timestamp: Date.now(),
+                command_type: commandType,
+                context: {
+                    trigger: 'mode_c_tempo_button',
+                    direction,
+                    adaptation_mode: currentAdaptationMode,
+                    experiment_id: experimentId,
+                    song_id: selectedFile?.songId ?? null,
+                    song_name: selectedFile?.title ?? null,
+                    song_artist: selectedFile?.artist ?? null,
+                },
+            });
+        },
+        [analyticsSessionName, currentAdaptationMode, experimentId, selectedFile],
+    );
     const [sequenceConfig, setSequenceConfig] = useState(null);
     const [sequenceConfigError, setSequenceConfigError] = useState('');
+    const [catalogTrackRows, setCatalogTrackRows] = useState([]);
 
     useLayoutEffect(() => {
         try {
@@ -192,52 +223,42 @@ const TestPlayerPage_20260504_BPM_energy = () => {
     const afterBlockSurveyQuestions = [
         'In what I just heard, the tempo matched my need.',
         'In what I just heard, the tempo felt natural.',
-        'Rate song 1',
-        'Rate song 2',
-        'Rate song 3',
         'It took effort to go through this sequence.',
         'What is your energy level right now? (0-10)',
+        'What is your stress level?',
     ];
-    const afterBlockSurveyInputTypes = ['scale', 'scale', 'scale', 'scale', 'scale', 'scale', 'scale'];
+    const afterBlockSurveyInputTypes = ['scale', 'scale', 'scale', 'scale', 'scale'];
     const afterBlockSurveyQuestionKinds = [
         'evaluation',
         'evaluation',
         'evaluation',
-        'evaluation',
-        'evaluation',
-        'evaluation',
+        'user_state',
         'user_state',
     ];
     const afterBlockSurveyScaleLabelTypes = [
         'agreement',
         'agreement',
-        'not_like_liked',
-        'not_like_liked',
-        'not_like_liked',
         'agreement',
         'low_high',
+        'low_high',
     ];
-    const afterBlockSurveyChoiceOptions = [[], [], [], [], [], [], []];
+    const afterBlockSurveyChoiceOptions = [[], [], [], [], []];
     const initialSurveyQuestions = [
         'Did you consume caffeine or alcohol in the last few hours?',
         'How did you sleep last night?',
-        'What time of day is it right now?',
         'What is your stress level?',
         'What is your energy level right now? (0-10)',
-        'What are you doing right now?',
+        'Where are you right now?',
         'Please specify',
-        'What device are you using?',
         'Are you using headphones?',
     ];
     const initialSurveyInputTypes = [
-        'choice',
         'choice',
         'choice',
         'scale',
         'scale',
         'choice',
         'comment',
-        'choice',
         'choice',
     ];
     const initialSurveyQuestionKinds = [
@@ -248,33 +269,21 @@ const TestPlayerPage_20260504_BPM_energy = () => {
         'user_state',
         'evaluation',
         'evaluation',
-        'evaluation',
-        'evaluation',
     ];
     const initialSurveyChoiceOptions = [
         ['No', 'Caffeine only', 'Alcohol only', 'Both caffeine and alcohol'],
         ['Very poorly', 'Poorly', 'Okay', 'Well', 'Very well'],
-        [
-            'Early morning (before 9)',
-            'Morning (9–12)',
-            'Afternoon (12–17)',
-            'Evening (17–21)',
-            'Night / late (after 21)',
-        ],
         [],
         [],
-        ['Work/focus', 'Commute', 'Relaxation', 'Sport/light exercise', 'Social/background', 'Other'],
+        ['In the car', 'At home', 'Outdoors', 'At work', 'Other'],
         [],
-        ['Mobile', 'Tablet', 'Laptop', 'Desktop'],
         ['Yes', 'No'],
     ];
     const initialSurveyScaleLabelTypes = [
         'agreement',
         'agreement',
-        'agreement',
         'low_high',
         'low_high',
-        'agreement',
         'agreement',
         'agreement',
         'agreement',
@@ -291,11 +300,20 @@ const TestPlayerPage_20260504_BPM_energy = () => {
         const sequenceDurationSecondsLabel =
             totalSequenceSeconds > 0 ? String(Math.floor(totalSequenceSeconds)) : '…';
 
+        const sequenceCount = 3;
+        const surveyCount = 5; // initial + after each sequence + final evaluation
+        const estimatedTestMinutes =
+            totalSequenceSeconds > 0
+                ? Math.floor((sequenceCount * totalSequenceSeconds) / 60) + surveyCount
+                : null;
+        const estimatedTestMinutesLabel =
+            estimatedTestMinutes != null ? String(estimatedTestMinutes) : '…';
+
         const modeSpecificPages = (() => {
             if (modeName === 'Mode C') {
                 return [
-                    'In this sequence, you can increase tempo by showing a thumb up to the camera, and decrease tempo by showing a thumb down.',
-                    'You can show additional thumbs up or thumbs down to further adjust the tempo until it feels right.',
+                    'In this sequence, you can press Tempo up or Tempo down buttons.',
+                    'You can modify further tempo up or down until it feels right.',
                 ];
             }
             if (modeName === 'Mode A') {
@@ -320,9 +338,10 @@ const TestPlayerPage_20260504_BPM_energy = () => {
             ];
         }
         return [
-            `You will hear three sequences. Each sequence will have a duration of ${sequenceDurationSecondsLabel} seconds and will play the same three songs, but differently.`,
-            'At the end of each sequence, you will have to rate the songs and answer some further questions.',
-            'At the end of this test, you will be asked to rate the sequences.',
+            `You will hear three sequences. All sequences play the same three songs and have a duration of ${sequenceDurationSecondsLabel} seconds. For each sequence, you can interact differently with the music.`,
+            'During sequences, your movements and reactions will be recorded, but NOT your video. You will be able to see in real time what is recorded.',
+            'At the end of each sequence, you will answer a few short questions about how you feel.',
+            `At the end of this test, you will be asked to rate the sequences. The total duration of this test is estimated to ${estimatedTestMinutesLabel} minutes.`,
             ...modeSpecificPages,
             'Let us start with the first sequence. When you are ready, click on Play.',
         ];
@@ -428,24 +447,18 @@ const TestPlayerPage_20260504_BPM_energy = () => {
                 }
                 console.log('[TestPlayerPage] raw tracks extracted:', rawTracks);
 
-                const rows = toPlaylistRows(rawTracks).sort((a, b) => {
-                    const t = String(a.title || '').localeCompare(String(b.title || ''));
-                    if (t !== 0) return t;
-                    return String(a.songId || '').localeCompare(String(b.songId || ''));
-                });
-                console.log('[TestPlayerPage] playlist rows normalized:', rows);
+                const rows = toPlaylistRows(rawTracks);
+                console.log('[TestPlayerPage] catalog rows normalized:', rows);
                 if (isCancelled) return;
                 if (rows.length === 0) {
                     throw new Error('Songs API returned no tracks');
                 }
 
-                setPlaylist(rows);
-                // Let Player auto-select/load the first track when ready.
-                setCurrentTrackIndex(-1);
-                setSelectedFile(null);
+                setCatalogTrackRows(rows);
             } catch (error) {
                 console.error('Failed to load test-player songs from info endpoint:', error);
                 if (isCancelled) return;
+                setCatalogTrackRows([]);
                 setPlaylist([]);
                 setCurrentTrackIndex(-1);
                 setSelectedFile(null);
@@ -464,21 +477,30 @@ const TestPlayerPage_20260504_BPM_energy = () => {
         };
     }, [idToken]);
 
+    useEffect(() => {
+        if (!catalogTrackRows.length) {
+            return;
+        }
+        const trackIds = sequenceConfig?.trackIds;
+        const ordered = trackIds?.length
+            ? buildSequencePlaylist(catalogTrackRows, trackIds, (track) => track.songId)
+            : catalogTrackRows;
+        setPlaylist(ordered);
+        setCurrentTrackIndex(-1);
+        setSelectedFile(null);
+    }, [catalogTrackRows, sequenceConfig?.trackIds]);
+
     const prepareSequenceStart = () => {
-        const ids = sequenceConfig?.trackIds;
-        const firstTrackId = ids?.[0];
-        const firstTrack = playlist.find((track) => String(track?.songId) === String(firstTrackId));
+        const firstTrack = playlist[0];
         if (!firstTrack?.url) return;
         blockTrackStepRef.current = 0;
-        const firstTrackIndex = playlist.findIndex((track) => track?.id === firstTrack.id);
-        setCurrentTrackIndex(firstTrackIndex);
+        setCurrentTrackIndex(0);
         setSelectedFile(firstTrack);
         persistOriginalBpmFromApi(firstTrack);
         if (audioRef.current) {
             loadAudioElementSource(audioRef.current, firstTrack.url, { anonymousCors: true });
             audioRef.current.currentTime = 0;
         }
-        blockTrackStepRef.current = 0;
     };
 
     // Handle music play event for active sequence.
@@ -567,8 +589,7 @@ const TestPlayerPage_20260504_BPM_energy = () => {
 
     const playNextTrackInBlock = () => {
         const nextStep = blockTrackStepRef.current + 1;
-        const blockIds = sequenceConfig?.trackIds ?? [];
-        if (nextStep >= blockIds.length) {
+        if (nextStep >= playlist.length) {
             clearBlockTrackTimer();
             if (audioRef.current) {
                 audioRef.current.pause();
@@ -577,9 +598,7 @@ const TestPlayerPage_20260504_BPM_energy = () => {
             setShowAfterBlockSurvey(true);
             return;
         }
-        const nextTrackId = blockIds[nextStep];
-        const nextTrack = playlist.find((track) => String(track?.songId) === String(nextTrackId));
-        const nextTrackIndex = playlist.findIndex((track) => track?.id === nextTrack?.id);
+        const nextTrack = playlist[nextStep];
         if (!nextTrack?.url) {
             clearBlockTrackTimer();
             if (audioRef.current) {
@@ -589,7 +608,7 @@ const TestPlayerPage_20260504_BPM_energy = () => {
             return;
         }
         blockTrackStepRef.current = nextStep;
-        playTrackByIndex(nextTrackIndex);
+        playTrackByIndex(nextStep);
     };
 
     return (
@@ -601,57 +620,45 @@ const TestPlayerPage_20260504_BPM_energy = () => {
                 <Player
                     key={`sequence-mode-${currentAdaptationModeIndex}-${reactionPolicyInstance.policyId || 'policy'}`}
                     selectedFile={selectedFile}
-                    pageName="test-player"
+                    sessionName="TestPlayer_20260504"
                     audioRef={audioRef}
+                    thumbBpmControlRef={thumbBpmControlRef}
                     initialReactionPolicyInstance={reactionPolicyInstance}
                     playlist={playlist}
                     currentTrackIndex={currentTrackIndex}
                     onTrackSelect={handleTestSequenceTrackSelect}
                     onMusicPlay={handleMusicPlay}
                     onMusicPause={handleMusicPause}
-                    fallbackDeckArtworkSrc={magicPlayerImage}
+                    showDeckArtwork={false}
+                    enableSensingOverlayOnScan={false}
                     enableSecondDeck={false}
                     enableTrackNavigation={false}
                     enableStopButton={false}
                     showTutorialButton={true}
                     onTutorialButtonClick={() => setShowSequenceTutorial(true)}
+                    sensingHeaderContent={
+                        <ModeCThumbTempoOverrideButtons
+                            show={currentAdaptationMode === 'Mode C'}
+                            thumbBpmControlRef={thumbBpmControlRef}
+                            onTempoStep={handleModeCTempoStep}
+                        />
+                    }
                 >
-                    {/* Feedback actions */}
-                    <div className="text-center mb-4">
-                        <div className="d-flex justify-content-center gap-2 flex-wrap">
+                    {(tracksLoadError || sequenceConfigError || policyLoadError) && (
+                        <div className="text-center mb-4">
                             {tracksLoadError && (
-                                <div className="text-danger w-100 mb-2">
-                                    {tracksLoadError}
-                                </div>
+                                <div className="text-danger w-100 mb-2">{tracksLoadError}</div>
                             )}
                             {sequenceConfigError && (
-                                <div className="text-danger w-100 mb-2">
-                                    {sequenceConfigError}
-                                </div>
+                                <div className="text-danger w-100 mb-2">{sequenceConfigError}</div>
                             )}
                             {policyLoadError && (
                                 <div className="text-warning w-100 mb-2">
                                     Policy fallback (server): {policyLoadError}
                                 </div>
                             )}
-                            <Button
-                                variant="outline-light"
-                                onClick={() => {
-                                    setRedirectToHomepageAfterEvaluationSubmit(false);
-                                    setShowEvaluationForm(true);
-                                }}
-                                className="me-2"
-                                style={{
-                                    padding: '0.75rem 1.5rem',
-                                    fontSize: '1rem',
-                                    whiteSpace: 'nowrap',
-                                    minWidth: 'fit-content'
-                                }}
-                            >
-                                Feedback
-                            </Button>
                         </div>
-                    </div>
+                    )}
 
                     {/* Evaluation form modal */}
                     <Forms
@@ -701,6 +708,7 @@ const TestPlayerPage_20260504_BPM_energy = () => {
                         adaptation_modes_sequence.length - 1
                     );
                     setCurrentAdaptationModeIndex(nextModeIndex);
+                    setShowSequenceTutorial(true);
                 }}
                 disableSubmission={false}
             />
@@ -712,7 +720,7 @@ const TestPlayerPage_20260504_BPM_energy = () => {
                 scaleLabelTypes={initialSurveyScaleLabelTypes}
                 scaleMin={0}
                 scaleMax={10}
-                optionalQuestionIndices={[6]}
+                optionalQuestionIndices={[5]}
                 formCategory="user_state_survey"
                 experimentId={experimentId}
                 formMetadata={currentExperimentMetadata}
@@ -720,6 +728,7 @@ const TestPlayerPage_20260504_BPM_energy = () => {
                 show={showInitialEnergySurvey}
                 onHide={() => {
                     setShowInitialEnergySurvey(false);
+                    setShowSequenceTutorial(true);
                 }}
                 disableSubmission={false}
             />
@@ -738,4 +747,4 @@ const TestPlayerPage_20260504_BPM_energy = () => {
     );
 };
 
-export default TestPlayerPage_20260504_BPM_energy;
+export default TestPlayerPage_20260504;

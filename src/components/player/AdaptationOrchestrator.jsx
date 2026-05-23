@@ -13,11 +13,16 @@ import {
     CUE_RING_SAMPLE_HZ,
 } from '../../hooks/ReactionMapperConfig';
 import { useCueTimeline } from '../../hooks/useCueTimeline';
-import { usePlaybackPolicy } from '../../hooks/usePlaybackPolicy';
+import { usePlaybackPolicy } from '../../music_adaptation/hooks/usePlaybackPolicy';
 import { isSensingDebugEnabled } from '../../music_adaptation/debug/sensingDebugFlag';
 import { emitCueTensorDebugSnapshot } from '../../music_adaptation/debug/cueTensorSnapshot';
 import { ingestSensingFeedIntoBuffer } from '../../music_adaptation/policy/compileReactionRecommendation';
 import { emptyReactionSensingFeedSnapshot, normalizeReactionSensingFeed } from '../../music_adaptation/feeds/reactionSensingFeed';
+import { runReactionCompile } from '../../music_adaptation/policy/runReactionCompile';
+import {
+    applyThumbTempoStep,
+    resolveThumbTempoStepBpm,
+} from '../test_player/modeCThumbTempoOverride';
 import UnifiedSensingUserUI from '../sensing_UI/UnifiedSensingUserUI';
 
 /** Named exports — EQ presets live under `music_adaptation/policy`. */
@@ -71,6 +76,8 @@ export {
  *     playbackCommands: object[],
  *     playbackIntents: object[],
  *   }) => void,
+ *   thumbBpmControlRef?: React.MutableRefObject<import('../test_player/modeCThumbTempoOverride').ThumbBpmControlHandle>,
+ *   enableSensingOverlayOnScan?: boolean,
  * }} props
  */
 const AdaptationOrchestrator = ({
@@ -81,8 +88,10 @@ const AdaptationOrchestrator = ({
     autoStartLandmarkTick = 0,
     forceStopDetectionTick = 0,
     enabled = true,
+    enableSensingOverlayOnScan = true,
     nodTrackBpmAudioRef,
     onReactionOutput,
+    thumbBpmControlRef,
 }) => {
     const { bufferRef } = useCueTimeline({ retentionMs: CUE_RING_RETENTION_MS });
     const reactionSensingFeedRef = useRef(emptyReactionSensingFeedSnapshot());
@@ -117,6 +126,42 @@ const AdaptationOrchestrator = ({
         nodTrackBpmAudioRef,
     });
 
+    const flushReactionCompile = useCallback(() => {
+        const raw = nodTrackBpmAudioRef?.current?.detectedTrackBpm;
+        const nodTrackBpm =
+            typeof raw === 'number' && Number.isFinite(raw) && raw > 0 ? raw : null;
+        return runReactionCompile({
+            buffer: bufferRef.current,
+            policyBundle: policyBundleRef.current,
+            prevDominantFaceToneRef,
+            persistentThumbBpmStateRef,
+            analysisWindowMs: EMOTION_ANALYSIS_WINDOW,
+            sampleHz: CUE_RING_SAMPLE_HZ,
+            nowMs: Date.now(),
+            nodTrackBpm,
+            latestSensingFeed: reactionSensingFeedRef.current,
+        });
+    }, [bufferRef, policyBundleRef, nodTrackBpmAudioRef]);
+
+    useEffect(() => {
+        if (!thumbBpmControlRef) {
+            return undefined;
+        }
+        thumbBpmControlRef.current = {
+            applyStep: (direction) => {
+                const stepBpm = resolveThumbTempoStepBpm(policyBundleRef.current);
+                applyThumbTempoStep(persistentThumbBpmStateRef.current, direction, stepBpm);
+                const output = flushReactionCompile();
+                if (onReactionOutput && output) {
+                    onReactionOutput(output);
+                }
+            },
+        };
+        return () => {
+            thumbBpmControlRef.current = null;
+        };
+    }, [thumbBpmControlRef, flushReactionCompile, onReactionOutput, policyBundleRef]);
+
     useEffect(() => {
         if (!isSensingDebugEnabled()) return undefined;
         const intervalMs = 500;
@@ -145,6 +190,7 @@ const AdaptationOrchestrator = ({
             sizeMode={sensingSizeMode}
             autoStartLandmarkTick={autoStartLandmarkTick}
             forceStopDetectionTick={forceStopDetectionTick}
+            enableSensingOverlayOnScan={enableSensingOverlayOnScan}
         />
     );
 };

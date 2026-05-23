@@ -27,7 +27,7 @@ const persistPlaybackDebug = (label, payload = {}) => {
     }
 };
 
-export function usePlaybackSessionAnalytics({ pageName, sessionName, resolveTrackName }) {
+export function usePlaybackSessionAnalytics({ sessionName, resolveTrackName }) {
     const playbackSessionActiveRef = useRef(false);
     const playbackSessionStartMsRef = useRef(0);
     const playbackSessionHeartbeatRef = useRef(null);
@@ -40,7 +40,7 @@ export function usePlaybackSessionAnalytics({ pageName, sessionName, resolveTrac
         }
         try {
             const payload = {
-                page_name: pageName,
+                page_name: sessionName,
                 session_name: sessionName,
                 track_name: resolveTrackName(),
                 started_at_ms: playbackSessionStartMsRef.current,
@@ -50,7 +50,7 @@ export function usePlaybackSessionAnalytics({ pageName, sessionName, resolveTrac
         } catch {
             // Ignore persistence failures.
         }
-    }, [pageName, resolveTrackName, sessionName]);
+    }, [resolveTrackName, sessionName]);
 
     const startPlaybackSession = useCallback(() => {
         if (playbackSessionActiveRef.current) return;
@@ -59,12 +59,12 @@ export function usePlaybackSessionAnalytics({ pageName, sessionName, resolveTrac
         unloadFlushSentRef.current = false;
         playbackSessionStartMsRef.current = Date.now();
         debugPlaybackAnalytics('start', {
-            pageName,
+            sessionName,
             started_at_ms: playbackSessionStartMsRef.current,
             track_name: resolveTrackName(),
         });
         persistPlaybackDebug('start', {
-            pageName,
+            sessionName,
             started_at_ms: playbackSessionStartMsRef.current,
             track_name: resolveTrackName(),
         });
@@ -106,7 +106,7 @@ export function usePlaybackSessionAnalytics({ pageName, sessionName, resolveTrac
             element_id: 'deck_A_playback_session',
             page_url: window.location.href,
             session_name: sessionName,
-            page_name: pageName,
+            page_name: sessionName,
             track_name: resolveTrackName(),
             duration_ms: durationMs,
             end_reason: endReason,
@@ -124,7 +124,7 @@ export function usePlaybackSessionAnalytics({ pageName, sessionName, resolveTrac
         debugPlaybackAnalytics('end-async', analyticsPayload);
         persistPlaybackDebug('end-async', analyticsPayload);
         await trackSimpleEvent(analyticsPayload);
-    }, [pageName, resolveTrackName, sessionName]);
+    }, [resolveTrackName, sessionName]);
 
     const flushPlaybackSessionOnUnload = useCallback((endReason) => {
         if (!playbackSessionActiveRef.current || !playbackSessionStartMsRef.current) {
@@ -166,7 +166,7 @@ export function usePlaybackSessionAnalytics({ pageName, sessionName, resolveTrac
             element_id: 'deck_A_playback_session',
             page_url: window.location.href,
             session_name: sessionName,
-            page_name: pageName,
+            page_name: sessionName,
             track_name: resolveTrackName(),
             duration_ms: durationMs,
             end_reason: endReason,
@@ -177,7 +177,7 @@ export function usePlaybackSessionAnalytics({ pageName, sessionName, resolveTrac
         // Keep a pending snapshot so next launch can recover if keepalive delivery fails on close.
         try {
             localStorage.setItem(ACTIVE_PLAYBACK_SESSION_KEY, JSON.stringify({
-                page_name: pageName,
+                page_name: sessionName,
                 session_name: sessionName,
                 track_name: resolveTrackName(),
                 started_at_ms: startedAt,
@@ -191,7 +191,7 @@ export function usePlaybackSessionAnalytics({ pageName, sessionName, resolveTrac
         }
 
         trackSimpleEventOnUnload(analyticsPayload);
-    }, [pageName, resolveTrackName, sessionName]);
+    }, [resolveTrackName, sessionName]);
 
     useEffect(() => {
         if (process.env.NODE_ENV !== 'production') {
@@ -221,7 +221,7 @@ export function usePlaybackSessionAnalytics({ pageName, sessionName, resolveTrac
                         element_id: 'deck_A_playback_session',
                         page_url: window.location.href,
                         session_name: snapshot?.session_name || sessionName,
-                        page_name: snapshot?.page_name || pageName,
+                        page_name: snapshot?.page_name || sessionName,
                         track_name: snapshot?.track_name || 'unknown_track',
                         duration_ms: recoveredDuration,
                         end_reason: snapshot?.end_reason || 'browser_closed_or_tab_ended',
@@ -234,7 +234,7 @@ export function usePlaybackSessionAnalytics({ pageName, sessionName, resolveTrac
         } catch {
             // Ignore malformed persisted snapshots.
         }
-    }, [pageName, sessionName]);
+    }, [sessionName]);
 
     useEffect(() => {
         const persistOnPageExit = () => {

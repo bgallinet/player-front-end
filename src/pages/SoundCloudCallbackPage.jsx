@@ -29,7 +29,7 @@ const SoundCloudCallbackPage = () => {
                 const success = await handleCallback(code, state);
 
                 if (success) {
-                    navigate('/soundcloudplayer');
+                    navigate('/', { replace: true });
                 } else {
                     navigate('/', {
                         state: { error: 'SoundCloud authentication failed. Please try again.' }

@@ -1,11 +1,12 @@
-import React, { useState, Fragment } from 'react';
+import React, { useState, useEffect, Fragment } from 'react';
 import { Button, Form as BootstrapForm } from 'react-bootstrap';
-import AnalyticsAPI from '../utils/AnalyticsAPI.jsx';
-import UserAPI from '../utils/UserAPI.jsx';
+import AnalyticsAPI from '../utils/AnalyticsAPI';
+import UserAPI from '../utils/UserAPI';
 import { createAuthenticatedRequestBody } from '../hooks/sessionUtils.js';
 import { getSessionNameFromUrl } from '../hooks/sessionUtils.js';
-import { secondaryColor } from '../utils/DisplaySettings.jsx';
+import { secondaryColor } from '../utils/DisplaySettings';
 import { buildAnalyticsFormMetadata } from '../utils/experimentSession';
+import GdprConsentBlock from './GdprConsentBlock';
 
 /**
  * Form
@@ -73,9 +74,26 @@ const Form = ({
     paragraphAfterQuestionIndex = null,
     /** When true, submit via User API (`user_request_type: listening_profile`) into `listening_profiles`. */
     persistListeningProfileToUserProfile = false,
+    /** When true, show embedded Privacy/Terms and require scroll + checkbox before submit. */
+    requireGdprConsent = false,
 }) => {
     const [responses, setResponses] = useState({});
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [gdprAgreed, setGdprAgreed] = useState(false);
+    const [gdprScrolledToBottom, setGdprScrolledToBottom] = useState(false);
+
+    useEffect(() => {
+        if (!show) {
+            setGdprAgreed(false);
+            setGdprScrolledToBottom(false);
+        }
+    }, [show]);
+
+    const handleGdprScroll = (e) => {
+        const { scrollTop, scrollHeight, clientHeight } = e.target;
+        const isAtBottom = scrollTop + clientHeight >= scrollHeight - 12;
+        setGdprScrolledToBottom(isAtBottom);
+    };
     // Validate inputs
     if (questions.length !== inputTypes.length) {
         console.error('FormComponent: questions and inputTypes arrays must have the same length');
@@ -179,6 +197,12 @@ const Form = ({
 
             if (!allAnswered) {
                 alert('Please answer all questions before submitting.');
+                setIsSubmitting(false);
+                return;
+            }
+
+            if (requireGdprConsent && !gdprAgreed) {
+                alert('Please read and agree to the Privacy Notice and Terms of Use before continuing.');
                 setIsSubmitting(false);
                 return;
             }
@@ -713,6 +737,9 @@ const Form = ({
         return null;
     }
 
+    /** Sticky GDPR footer needs a fixed modal height; short forms use one scroll area instead. */
+    const gdprStickyFooter = requireGdprConsent && questions.length >= 8;
+
     return (
         <div
             style={{
@@ -734,16 +761,44 @@ const Form = ({
                     backgroundColor: '#1a1a1a',
                     borderRadius: '0.5rem',
                     padding: '2rem',
-                    maxWidth: '600px',
+                    maxWidth: requireGdprConsent ? '720px' : '600px',
                     width: '100%',
-                    maxHeight: '80vh',
-                    overflowY: 'auto',
+                    maxHeight: requireGdprConsent ? '90vh' : '80vh',
+                    height: gdprStickyFooter ? '90vh' : undefined,
+                    overflowY: gdprStickyFooter ? 'hidden' : 'auto',
+                    display: gdprStickyFooter ? 'flex' : 'block',
+                    flexDirection: gdprStickyFooter ? 'column' : undefined,
                     border: `2px solid ${secondaryColor}`,
-                    boxShadow: '0 10px 30px rgba(0, 0, 0, 0.5)'
+                    boxShadow: '0 10px 30px rgba(0, 0, 0, 0.5)',
                 }}
                 onClick={(e) => e.stopPropagation()}
             >
-                <form onSubmit={handleSubmit}>
+                <form
+                    onSubmit={handleSubmit}
+                    style={
+                        gdprStickyFooter
+                            ? {
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  flex: 1,
+                                  minHeight: 0,
+                              }
+                            : undefined
+                    }
+                >
+                    <div
+                        style={
+                            gdprStickyFooter
+                                ? {
+                                      flex: '1 1 0',
+                                      minHeight: '12rem',
+                                      overflowY: 'auto',
+                                      paddingRight: '0.35rem',
+                                      marginBottom: '1rem',
+                                  }
+                                : undefined
+                        }
+                    >
                     {introText ? (
                         <p style={{ color: 'white', fontSize: '1rem', marginBottom: '1rem' }}>
                             {introText}
@@ -784,13 +839,35 @@ const Form = ({
                             </Fragment>
                         );
                     })}
+                    </div>
+
+                    {requireGdprConsent && (
+                        <div style={{ flexShrink: 0 }}>
+                            <GdprConsentBlock
+                                agreed={gdprAgreed}
+                                onAgreedChange={setGdprAgreed}
+                                scrolledToBottom={gdprScrolledToBottom}
+                                onScroll={handleGdprScroll}
+                                disabled={isSubmitting}
+                            />
+                        </div>
+                    )}
                     
                     {!disableSubmission && (
-                        <div className="d-flex justify-content-end mt-4 pt-3" style={{ borderTop: '1px solid #333' }}>
+                        <div
+                            className="d-flex justify-content-end mt-4 pt-3"
+                            style={{
+                                borderTop: '1px solid #333',
+                                flexShrink: gdprStickyFooter ? 0 : undefined,
+                            }}
+                        >
                             <Button
                                 type="submit"
                                 variant="primary"
-                                disabled={isSubmitting}
+                                disabled={
+                                    isSubmitting ||
+                                    (requireGdprConsent && (!gdprAgreed || !gdprScrolledToBottom))
+                                }
                                 style={{ 
                                     minWidth: '120px',
                                     backgroundColor: secondaryColor,

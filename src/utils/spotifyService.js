@@ -7,7 +7,7 @@
  * Set REACT_APP_SPOTIFY_CLIENT_ID (and optional REACT_APP_SPOTIFY_CLIENT_SECRET) in .env.local
  */
 
-import EnvironmentVariables from './EnvironmentVariables';
+import EnvironmentVariables from '../EnvironmentVariables';
 
 import { getSpotifyLoopbackOrigin, isSpotifyLocalhostDev } from './spotifyAuthBridge';
 
@@ -285,9 +285,11 @@ export const formatTrackMetadataDisplay = (track) => {
     const bpm = Number(track?.bpm ?? track?.track_bpm);
     if (Number.isFinite(bpm) && bpm > 0) {
         const sourceLabels = {
+            spotify_audio_features: 'Tempo (Spotify)',
             preview: 'Estimated tempo (preview)',
             acousticbrainz: 'Tempo (MusicBrainz)',
             getsongbpm: 'Tempo (GetSongBPM)',
+            catalog: 'Tempo (catalog)',
         };
         const bpmLabel = sourceLabels[track?.bpmSource] || 'Tempo';
         rows.push({ label: bpmLabel, value: `${bpm} BPM` });

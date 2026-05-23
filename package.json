@@ -24,6 +24,7 @@
     "@testing-library/user-event": "^13.5.0"
   },
   "scripts": {
+    "postinstall": "node scripts/patch-mediapipe-sourcemap.js",
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",

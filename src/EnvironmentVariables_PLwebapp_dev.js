@@ -20,9 +20,12 @@ const getCurrentProtocol = () => {
 
 const getCurrentHost = () => {
     if (typeof window !== 'undefined') {
-        return window.location.host; // 'localhost:3000' or whatever
+        const { hostname, port } = window.location;
+        const host =
+            hostname === '127.0.0.1' || hostname === '[::1]' ? 'localhost' : hostname;
+        return port ? `${host}:${port}` : host;
     }
-    return 'localhost:3000'; // Default fallback
+    return 'localhost:3000';
 };
 
 // Build redirect URI dynamically based on current page protocol

@@ -155,7 +155,7 @@ const LocalPlayerPage = () => {
         <>
             <Player
                 selectedFile={selectedFile}
-                pageName="local-player"
+                sessionName="LocalPlayer"
                 audioRef={audioRef}
                 playlist={playlist}
                 currentTrackIndex={currentTrackIndex}

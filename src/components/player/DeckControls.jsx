@@ -49,18 +49,20 @@ export const DeckControls = ({
     setTutorialDismissed,
     /** Cover / artwork (URL string), e.g. SoundCloud `artwork_url` */
     artworkUrl,
+    /** When false, no cover image is shown above transport controls. */
+    showArtwork = true,
     artworkSizePx = 120,
     /** Optional status line (e.g. stream loading) */
     trackStatusMessage,
     trackStatusLoading = false
 }) => {
-    const [artworkSrc, setArtworkSrc] = useState(
-        () => artworkUrl || defaultDeckArtwork
+    const [artworkSrc, setArtworkSrc] = useState(() =>
+        showArtwork ? artworkUrl || defaultDeckArtwork : null,
     );
 
     useEffect(() => {
-        setArtworkSrc(artworkUrl || defaultDeckArtwork);
-    }, [artworkUrl]);
+        setArtworkSrc(showArtwork ? artworkUrl || defaultDeckArtwork : null);
+    }, [artworkUrl, showArtwork]);
 
     const handleArtworkError = useCallback(() => {
         setArtworkSrc((prev) => (prev === defaultDeckArtwork ? prev : defaultDeckArtwork));
@@ -243,7 +245,7 @@ export const DeckControls = ({
                     )}
                 </div>
             )}
-            {artworkSrc && (
+            {showArtwork && artworkSrc && (
                 <div className="text-center" style={{ marginTop: '0.15rem', marginBottom: '0.35rem' }}>
                     <img
                         src={artworkSrc}

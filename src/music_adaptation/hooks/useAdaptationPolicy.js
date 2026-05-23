@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { fetchAdaptationPolicy } from '../utils/fetchAdaptationPolicy';
-import { buildReactionPolicyInstanceFromApi } from '../utils/buildReactionPolicyInstanceFromApi';
-import { createBuiltinStaticReactionPolicyInstance } from '../music_adaptation/policy/reactionPolicyInstances.v1';
+import { fetchAdaptationPolicy } from '../../utils/fetchAdaptationPolicy';
+import { buildReactionPolicyInstanceFromApi } from '../../utils/buildReactionPolicyInstanceFromApi';
+import { createBuiltinStaticReactionPolicyInstance } from '../policy/reactionPolicyInstances.v1';
 
 /**
  * Load server adaptation policy for experiment + variant.

@@ -3,7 +3,7 @@
  * Parsed once per tab session and cached in sessionStorage (not on every page view).
  */
 
-import EnvironmentVariables from './EnvironmentVariables';
+import EnvironmentVariables from '../EnvironmentVariables';
 import { createAuthenticatedRequestBody, getSessionNameFromUrl } from '../hooks/sessionUtils';
 
 const STORAGE_KEY = 'analytics_client_environment_v1';

@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { fetchTokens } from '../utils/Auth';
 import UserAPI from '../utils/UserAPI';
-import EnvironmentVariables from '../utils/EnvironmentVariables';
+import EnvironmentVariables from '../EnvironmentVariables';
 import { parseProcessDataResponse } from '../utils/parseProcessDataResponse';
 
 export default function Callback() {

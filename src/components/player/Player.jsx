@@ -27,14 +27,6 @@ function resolveDeckArtworkUrl(source) {
     return url.includes('-large') ? url.replace('-large', '-t300x300') : url;
 }
 
-function resolvePlayerSessionName(pageName) {
-    if (pageName === 'test-player') return 'TestPlayer_20260504_BPM_energy';
-    if (pageName === 'local-player') return 'LocalPlayer';
-    if (pageName === 'soundcloud-player') return 'SoundCloudPlayer';
-    if (pageName === 'spotify-player') return 'SpotifyPlayer';
-    return pageName || 'Player';
-}
-
 const Player = ({
     // Audio source
     selectedFile,
@@ -54,12 +46,20 @@ const Player = ({
     
     // Additional content to render above audio controls
     children,
+    /** Optional content rendered above deck controls (e.g. fixed sequence playlist). */
+    topContent = null,
     
-    // Page tracking
-    pageName = 'player',
+    /** Analytics session id for this player instance (e.g. TestPlayer_20260504, SpotifyPlayer). */
+    sessionName = 'Player',
 
     /** Shown on deck A when the track has no `artwork_url` (e.g. local hero image) */
     fallbackDeckArtworkSrc,
+    /** When false, deck A shows no cover/logo above transport controls. */
+    showDeckArtwork = true,
+    /** When false, sensing stays inline when detection starts (no fullscreen overlay on play). */
+    enableSensingOverlayOnScan = true,
+    /** Optional content rendered directly above the sensing UI (e.g. test tempo controls). */
+    sensingHeaderContent = null,
     /** Deck A transport status (e.g. SoundCloud stream loading) */
     deckATrackStatusMessage,
     deckATrackStatusLoading = false,
@@ -72,8 +72,12 @@ const Player = ({
     enableTrackNavigation = true,
     /** Show/hide stop transport controls. */
     enableStopButton = true,
+    /** When set (e.g. Spotify SDK), overrides deck A play/pause button state from audio element events. */
+    deckAIsPlaying = null,
     /** Optional initial reaction policy instance for page-specific defaults. */
     initialReactionPolicyInstance = null,
+    /** Optional ref filled by AdaptationOrchestrator for test-only thumb BPM overrides. */
+    thumbBpmControlRef = null,
     /** Optional context tutorial button for deck A. */
     showTutorialButton = false,
     onTutorialButtonClick = null,
@@ -137,14 +141,15 @@ const Player = ({
     reactionPolicyBundleRef.current = reactionPolicyInstance;
 
     const applyRecommendationToConsole = useAudioGraphCompiler(audioRef);
-    const playerSessionName = resolvePlayerSessionName(pageName);
+    const playerSessionNameRef = useRef(sessionName);
+    const playerSessionName = playerSessionNameRef.current;
     // Track page view on component mount (guard against StrictMode double-invocation)
     const hasTrackedPageView = useRef(false);
     useEffect(() => {
         if (!hasTrackedPageView.current) {
             hasTrackedPageView.current = true;
             trackPageView({
-                pageName: pageName,
+                pageName: playerSessionName,
                 additionalData: {
                     session_name: playerSessionName,
                     has_camera: !!stream,
@@ -424,7 +429,6 @@ const Player = ({
     const noddingAmplitudeForDeckUi = Number(currentRecommendation?.noddingAmplitude) || 0;
 
     const { startPlaybackSession, endPlaybackSession } = usePlaybackSessionAnalytics({
-        pageName,
         sessionName: playerSessionName,
         resolveTrackName: resolveActiveTrackName,
     });
@@ -492,6 +496,13 @@ const Player = ({
         onTrackSelect,
         isTrackSwitchingRef,
     });
+
+    useEffect(() => {
+        if (typeof deckAIsPlaying === 'boolean') {
+            deckATransport.setIsPlaying(deckAIsPlaying);
+        }
+    }, [deckAIsPlaying, deckATransport]);
+
     const deckBTransport = useDeckTransport({
         audioRef: deckBAudioRef,
         hasValidAudioSource: hasValidAudioSourceDeckB,
@@ -568,11 +579,11 @@ const Player = ({
         }
     }, [onTrackSelect, playlist, currentTrackIndex, onLoadDeckBTrack, deckBAudioRef]);
 
-    const deck1ArtworkUrl =
-        resolveDeckArtworkUrl(loadedDeckATrack) ||
-        resolveDeckArtworkUrl(selectedFile) ||
-        fallbackDeckArtworkSrc ||
-        logoSmall;
+    const deck1TrackArtworkUrl =
+        resolveDeckArtworkUrl(loadedDeckATrack) || resolveDeckArtworkUrl(selectedFile);
+    const deck1ArtworkUrl = showDeckArtwork
+        ? deck1TrackArtworkUrl || fallbackDeckArtworkSrc || logoSmall
+        : deck1TrackArtworkUrl || null;
     const deck2ArtworkUrl = resolveDeckArtworkUrl(loadedDeckBTrack) || logoSmall;
     const deck1ArtworkSizePx = secondDeckActive ? 96 : 120;
     const deck2ArtworkSizePx = 96;
@@ -580,6 +591,7 @@ const Player = ({
     return (
         <Container fluid className="mt-4 px-3">
             <div className="bg-dark rounded p-4" style={{ backgroundColor: '#1a1a1a' }}>
+                {topContent}
                 {/* Playback controls, detection, and sound console — above library / track UI */}
                 <div className="d-flex flex-column mb-4" style={{ width: '100%', overflow: 'visible' }}>
                     {enableSecondDeck && (
@@ -637,7 +649,7 @@ const Player = ({
                                     currentSongArtist={resolveActiveArtist()}
                                     onLoadTrack={handleLoadTrackToDeck}
                                     loadedTrackName={loadedDeckATrack?.displayName || selectedFile?.name || ''}
-                                    isPlaying={deckATransport.isPlaying}
+                                    isPlaying={deckAIsPlaying ?? deckATransport.isPlaying}
                                     currentTime={deckATransport.currentTime}
                                     duration={deckATransport.duration}
                                     hasValidAudioSource={hasValidAudioSource}
@@ -664,6 +676,7 @@ const Player = ({
                                     setTutorialDismissed={() => {}}
                                     onTutorialClick={onTutorialButtonClick}
                                     artworkUrl={deck1ArtworkUrl}
+                                    showArtwork={showDeckArtwork}
                                     artworkSizePx={deck1ArtworkSizePx}
                                     trackStatusMessage={deckATrackStatusMessage}
                                     trackStatusLoading={deckATrackStatusLoading}
@@ -738,19 +751,35 @@ const Player = ({
                         </div>
                     )}
 
+                    {sensingHeaderContent ? (
+                        <div
+                            style={{
+                                width: '100%',
+                                position: 'relative',
+                                zIndex: 1,
+                                clear: 'both',
+                                marginTop: '0.5rem',
+                                marginBottom: '0.5rem',
+                            }}
+                        >
+                            {sensingHeaderContent}
+                        </div>
+                    ) : null}
                     {/* Detection UI — face, pose, and hands in one pipeline */}
                     {stream && (
                         <div style={{ width: '100%', position: 'relative', zIndex: 1, clear: 'both', marginTop: '0.5rem', marginBottom: '1rem' }}>
                             <AdaptationOrchestrator
                                 policyBundleRef={reactionPolicyBundleRef}
                                 stream={stream}
-                                sensingSessionName={`${pageName}_session`}
+                                sensingSessionName={`${playerSessionName}_session`}
                                 sensingSizeMode="large"
                                 autoStartLandmarkTick={autoStartLandmarkWithMusic ? landmarkAutoStartTick : 0}
                                 forceStopDetectionTick={detectionForceStopTick}
                                 enabled={!!stream}
+                                enableSensingOverlayOnScan={enableSensingOverlayOnScan}
                                 nodTrackBpmAudioRef={audioRef}
                                 onReactionOutput={handleReactionCompileOutput}
+                                thumbBpmControlRef={thumbBpmControlRef}
                             />
                         </div>
                     )}

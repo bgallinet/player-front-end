@@ -2,7 +2,7 @@
  * Compile server-authored declarative rule descriptors (JSON) into runtime rules.
  */
 
-import EnvironmentVariables from '../../utils/EnvironmentVariables';
+import EnvironmentVariables from '../../EnvironmentVariables';
 import { getDeclarativeRulesRuntime } from './declarativeReactionRules';
 
 export const ENERGY_SURVEY_LOCAL_STORAGE_KEY = 'latest_energy_survey';

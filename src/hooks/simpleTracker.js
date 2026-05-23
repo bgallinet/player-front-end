@@ -1,7 +1,7 @@
 import AnalyticsAPI from '../utils/AnalyticsAPI';
 import UserAPI from '../utils/UserAPI';
 import { createAuthenticatedRequestBody } from './sessionUtils';
-import EnvironmentVariables from '../utils/EnvironmentVariables';
+import EnvironmentVariables from '../EnvironmentVariables';
 import { enrichAnalyticsRequestBody } from '../utils/clientEnvironment';
 import { mergeActiveExperimentIntoAnalyticsRequestBody } from '../utils/experimentSession';
 

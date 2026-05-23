@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext, useCallback } from 'react';
+import React, { useState, useEffect, useContext, useCallback, useRef } from 'react';
 import {
     generateCodeVerifier,
     generateCodeChallenge,
@@ -10,9 +10,11 @@ import {
 } from '../utils/spotifyService';
 import {
     SPOTIFY_AUTH_MESSAGE,
+    SPOTIFY_RETURN_PATH_KEY,
+    SPOTIFY_RETURN_ORIGIN_KEY,
     getSpotifyConnectUrl,
-    getSpotifyLoopbackOrigin,
     isSpotifyLocalhostDev,
+    isTrustedSpotifyAuthMessageOrigin,
 } from '../utils/spotifyAuthBridge';
 
 const SpotifyAuthContext = React.createContext(null);
@@ -27,10 +29,11 @@ export function useSpotifyAuth() {
 
 export function SpotifyAuthProvider({ children }) {
     const [accessToken, setAccessToken] = useState(null);
-    const [refreshToken, setRefreshToken] = useState(null);
+    const [, setRefreshToken] = useState(null);
     const [user, setUser] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(null);
+    const spotifyPopupPollRef = useRef(null);
 
     const isAuthenticated = !!accessToken;
 
@@ -115,8 +118,16 @@ export function SpotifyAuthProvider({ children }) {
         void restoreSession();
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+    const clearSpotifyPopupPoll = useCallback(() => {
+        if (spotifyPopupPollRef.current) {
+            clearInterval(spotifyPopupPollRef.current);
+            spotifyPopupPollRef.current = null;
+        }
+    }, []);
+
     const completeAuthFromPopup = useCallback(
         async ({ tokens, user: profile }) => {
+            clearSpotifyPopupPoll();
             saveTokens(tokens);
             sessionStorage.removeItem('sp_code_verifier');
             sessionStorage.removeItem('sp_state');
@@ -128,17 +139,18 @@ export function SpotifyAuthProvider({ children }) {
             }
             setIsLoading(false);
         },
-        [saveTokens, loadUserProfile],
+        [clearSpotifyPopupPoll, saveTokens, loadUserProfile],
     );
 
     useEffect(() => {
         if (!isSpotifyLocalhostDev()) return undefined;
 
         const onMessage = (event) => {
-            if (event.origin !== getSpotifyLoopbackOrigin()) return;
+            if (!isTrustedSpotifyAuthMessageOrigin(event.origin)) return;
             if (event.data?.type !== SPOTIFY_AUTH_MESSAGE) return;
 
             if (event.data.error) {
+                clearSpotifyPopupPoll();
                 setError(event.data.error);
                 setIsLoading(false);
                 return;
@@ -152,20 +164,37 @@ export function SpotifyAuthProvider({ children }) {
 
         window.addEventListener('message', onMessage);
         return () => window.removeEventListener('message', onMessage);
-    }, [completeAuthFromPopup]);
+    }, [clearSpotifyPopupPoll, completeAuthFromPopup]);
+
+    useEffect(() => () => clearSpotifyPopupPoll(), [clearSpotifyPopupPoll]);
 
     const initiateLogin = useCallback(async () => {
         try {
             setError(null);
             setIsLoading(true);
+            clearSpotifyPopupPoll();
+
+            sessionStorage.setItem(
+                SPOTIFY_RETURN_PATH_KEY,
+                `${window.location.pathname}${window.location.search}`,
+            );
 
             if (isSpotifyLocalhostDev()) {
+                sessionStorage.setItem(SPOTIFY_RETURN_ORIGIN_KEY, window.location.origin);
+
                 const url = getSpotifyConnectUrl(window.location.origin);
                 const popup = window.open(url, 'spotify-auth', 'width=520,height=720');
                 if (!popup) {
                     setIsLoading(false);
                     setError('Allow pop-ups for this site to connect Spotify.');
+                    return;
                 }
+
+                spotifyPopupPollRef.current = setInterval(() => {
+                    if (!popup.closed) return;
+                    clearSpotifyPopupPoll();
+                    setIsLoading(false);
+                }, 500);
                 return;
             }
 
@@ -179,10 +208,11 @@ export function SpotifyAuthProvider({ children }) {
             window.location.href = getAuthUrl(codeChallenge, state);
         } catch (err) {
             console.error('Failed to initiate Spotify login:', err);
+            clearSpotifyPopupPoll();
             setIsLoading(false);
             setError('Failed to start login. Please try again.');
         }
-    }, []);
+    }, [clearSpotifyPopupPoll]);
 
     const handleCallback = useCallback(
         async (code, returnedState) => {

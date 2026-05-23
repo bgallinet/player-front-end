@@ -3,7 +3,12 @@ import { Button, Spinner } from 'react-bootstrap';
 import { Subtitle, StyledCard, Text } from '../styles/StyledComponents';
 import { secondaryColor } from '../utils/DisplaySettings';
 import ExpandReduceButton from '../buttons/ExpandReduceButton';
-import GetSongBpmAttribution from '../components/GetSongBpmAttribution';
+import {
+    GETSONGBPM_ATTRIBUTION_LINK_STYLE,
+    GETSONGBPM_ATTRIBUTION_SITE_NAME,
+    GETSONGBPM_ATTRIBUTION_URL,
+    getGetSongBpmAttributionStyle,
+} from '../utils/getsongBpmAttribution';
 import Player from '../components/player/Player';
 import PlaylistCard from '../components/library_panels/PlaylistCard';
 import SpotifyLibraryPanel from '../components/library_panels/SpotifyLibraryPanel';
@@ -30,6 +35,7 @@ const SpotifyPlayerPage = () => {
 
     const {
         isReady: playbackReady,
+        isPaused: spotifyIsPaused,
         error: playbackError,
         playUri,
         pause,
@@ -128,10 +134,12 @@ const SpotifyPlayerPage = () => {
             setError('');
 
             try {
-                await spotifyTransport.current.playUri(uri);
                 if (audioRef.current?._setSpotifyTrack) {
                     audioRef.current._setSpotifyTrack(uri);
                 }
+                await spotifyTransport.current.playUri(uri);
+                // Spotify plays via SDK, not audioEl.play() — sync deck UI + analytics
+                audioRef.current?.dispatchEvent(new Event('play'));
                 detectTrackBpm(track, { allowMediaElement: true });
             } catch (err) {
                 console.error('Failed to load Spotify track:', err);
@@ -201,6 +209,12 @@ const SpotifyPlayerPage = () => {
         [playlist, currentTrackIndex, handlePlaylistChange],
     );
 
+    const deckAIsPlaying =
+        isAuthenticated &&
+        playbackReady &&
+        !spotifyIsPaused &&
+        Boolean(selectedFile?.uri || selectedFile?.spTrack?.uri);
+
     // Render login screen if not authenticated
     if (authLoading) {
         return (
@@ -268,12 +282,13 @@ const SpotifyPlayerPage = () => {
         <>
             <Player
                 selectedFile={selectedFile}
-                pageName="spotify-player"
+                sessionName="SpotifyPlayer"
                 audioRef={audioRef}
                 playlist={playlist}
                 currentTrackIndex={currentTrackIndex}
                 onPlaylistChange={handlePlaylistChange}
                 onTrackSelect={handlePlaylistTrackSelect}
+                deckAIsPlaying={deckAIsPlaying}
                 enableSecondDeck={false}
                 deckATrackStatusMessage={
                     !playbackReady
@@ -291,7 +306,7 @@ const SpotifyPlayerPage = () => {
                 onPlaylistChange={handlePlaylistChange}
                 currentTrackIndex={currentTrackIndex}
                 onTrackSelect={handlePlaylistTrackSelect}
-                isPlaying={audioRef.current && !audioRef.current.paused}
+                isPlaying={deckAIsPlaying}
                 spotifyAccessToken={accessToken}
             />
 
@@ -361,7 +376,17 @@ const SpotifyPlayerPage = () => {
                     Disconnect
                 </Button>
                 </div>
-                <GetSongBpmAttribution style={{ marginTop: '0.75rem' }} />
+                <p style={getGetSongBpmAttributionStyle({ marginTop: '0.75rem' })}>
+                    Tempo data from{' '}
+                    <a
+                        href={GETSONGBPM_ATTRIBUTION_URL}
+                        rel="noopener noreferrer"
+                        target="_blank"
+                        style={GETSONGBPM_ATTRIBUTION_LINK_STYLE}
+                    >
+                        {GETSONGBPM_ATTRIBUTION_SITE_NAME}
+                    </a>
+                </p>
             </Player>
         </>
     );
