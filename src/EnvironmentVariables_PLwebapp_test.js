@@ -1,5 +1,5 @@
 // API Gateway URL - using custom domain for stable endpoint
-const API_gateway_url = "https://rgiesci0s7.execute-api.eu-west-3.amazonaws.com/player-test-stage-dsafun3r";
+const API_gateway_url = "https://7y8yz31wh4.execute-api.eu-west-3.amazonaws.com/player-test-stage-fmww9b01";
 const environment_flag = "test"
 
 // WebSocket URLs

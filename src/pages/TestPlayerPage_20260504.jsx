@@ -13,7 +13,6 @@ import {
     fetchExperimentConfigFromAnalytics,
 } from '../utils/fetchExperimentConfigFromAnalytics';
 import ModeCThumbTempoOverrideButtons from '../components/test_player/ModeCThumbTempoOverrideButtons';
-import { trackSimpleEvent } from '../hooks/simpleTracker';
 
 const TEST_CLOUDFRONT_URL =
     process.env.REACT_APP_TEST_TRACKS_CDN_URL || 'https://dhuj2x4ippvty.cloudfront.net';
@@ -21,7 +20,7 @@ const TEST_CLOUDFRONT_URL =
 /** DB `experiments.id` — must match `controlled_experiments.csv` */
 const EXPERIMENT_DB_ID = '20260504';
 
-export const adaptation_modes_sequence = ['Mode C', 'Mode B', 'Mode A'];
+export const adaptation_modes_sequence = ['Mode B', 'Mode C', 'Mode A'];
 
 /**
  * Returns a randomized copy of the provided adaptation mode sequence.
@@ -59,7 +58,8 @@ function loadAudioElementSource(audioEl, url, options = {}) {
 
 const TestPlayerPage_20260504 = () => {
     const { idToken } = useAuth();
-    const [showInitialEnergySurvey, setShowInitialEnergySurvey] = useState(true);
+    const [showTestRequirements, setShowTestRequirements] = useState(true);
+    const [showInitialEnergySurvey, setShowInitialEnergySurvey] = useState(false);
     const [selectedFile, setSelectedFile] = useState(null);
     const [playlist, setPlaylist] = useState([]);
     const [currentTrackIndex, setCurrentTrackIndex] = useState(-1);
@@ -71,15 +71,14 @@ const TestPlayerPage_20260504 = () => {
     const [currentAdaptationModeIndex, setCurrentAdaptationModeIndex] = useState(0);
     const audioRef = useRef(null);
     const thumbBpmControlRef = useRef(null);
+    const playbackAnalyticsRef = useRef(null);
     const blockTrackTimerRef = useRef(null);
     const blockTrackStepRef = useRef(0);
     const isAutoSwitchingTrackRef = useRef(false);
-    // TODO: restore random mode order — temporarily fixed C → B → A
-    const randomizedAdaptationModesSequence = adaptation_modes_sequence;
-    // const randomizedAdaptationModesSequence = useMemo(
-    //     () => randomizeAdaptationModesSequence(adaptation_modes_sequence),
-    //     []
-    // );
+    const randomizedAdaptationModesSequence = useMemo(
+        () => randomizeAdaptationModesSequence(adaptation_modes_sequence),
+        []
+    );
     const currentAdaptationMode =
         randomizedAdaptationModesSequence[currentAdaptationModeIndex] ?? randomizedAdaptationModesSequence[0];
     console.log('[TestPlayerPage] chosen adaptation mode:', currentAdaptationMode);
@@ -92,7 +91,7 @@ const TestPlayerPage_20260504 = () => {
         experimentId: EXPERIMENT_DB_ID,
         variantId: currentAdaptationMode,
         idToken,
-        enabled: !showInitialEnergySurvey,
+        enabled: !showTestRequirements && !showInitialEnergySurvey,
     });
     const currentExperimentMetadata = useMemo(
         () => buildExperimentMetadataForMode(currentAdaptationMode),
@@ -100,29 +99,6 @@ const TestPlayerPage_20260504 = () => {
     );
     const analyticsSessionName = 'test_20260504';
 
-    const handleModeCTempoStep = useCallback(
-        (direction) => {
-            const commandType = direction === 'up' ? 'thumbs_up' : 'thumbs_down';
-            void trackSimpleEvent({
-                interaction_type: commandType,
-                element_id: direction === 'up' ? 'mode_c_tempo_up_button' : 'mode_c_tempo_down_button',
-                session_name: analyticsSessionName,
-                page_url: window.location.href,
-                timestamp: Date.now(),
-                command_type: commandType,
-                context: {
-                    trigger: 'mode_c_tempo_button',
-                    direction,
-                    adaptation_mode: currentAdaptationMode,
-                    experiment_id: experimentId,
-                    song_id: selectedFile?.songId ?? null,
-                    song_name: selectedFile?.title ?? null,
-                    song_artist: selectedFile?.artist ?? null,
-                },
-            });
-        },
-        [analyticsSessionName, currentAdaptationMode, experimentId, selectedFile],
-    );
     const [sequenceConfig, setSequenceConfig] = useState(null);
     const [sequenceConfigError, setSequenceConfigError] = useState('');
     const [catalogTrackRows, setCatalogTrackRows] = useState([]);
@@ -167,7 +143,7 @@ const TestPlayerPage_20260504 = () => {
     }, []);
 
     useEffect(() => {
-        if (showInitialEnergySurvey) {
+        if (showTestRequirements || showInitialEnergySurvey) {
             return undefined;
         }
         activateExperiment({
@@ -180,6 +156,7 @@ const TestPlayerPage_20260504 = () => {
             deactivateExperiment();
         };
     }, [
+        showTestRequirements,
         showInitialEnergySurvey,
         experimentId,
         currentAdaptationMode,
@@ -188,17 +165,17 @@ const TestPlayerPage_20260504 = () => {
     ]);
 
     useEffect(() => {
-        if (showInitialEnergySurvey) return;
+        if (showTestRequirements || showInitialEnergySurvey) return;
         if (currentAdaptationMode !== 'Mode B') return;
         void fetchLatestEnergySurveyFromUserEndpoint(idToken).then((value) => {
             console.log('[TestPlayerPage][Mode B] refreshed latest_energy_survey before sequence', { value });
         });
-    }, [currentAdaptationMode, idToken, showInitialEnergySurvey]);
+    }, [currentAdaptationMode, idToken, showTestRequirements, showInitialEnergySurvey]);
 
     const finalFeedbackIntro =
         'Thank you for your participation. Before ending this test session, we need from you to answer these questions.';
     const evaluationQuestions = [
-        'Rank the 3 sequences (1 best to 3 worst).',
+        'Rank the 3 sequences from best to worst.',
         'Most of the time, I wanted the music to...',
         'This sequence best matched my energy:',
         'This sequence best helped me shift my energy level.',
@@ -210,6 +187,7 @@ const TestPlayerPage_20260504 = () => {
 
     const evaluationInputTypes = ['ranking', 'choice', 'choice', 'choice', 'choice', 'comment', 'comment', 'comment'];
     const evaluationQuestionKinds = evaluationQuestions.map(() => 'evaluation');
+    const evaluationRankingSlotLabels = ['Best', 'Middle', 'Worst'];
     const evaluationChoiceOptions = [
         ['Sequence 1', 'Sequence 2', 'Sequence 3'],
         ['Match my energy', 'Help me shift my energy', 'Depends on the situation'],
@@ -224,8 +202,8 @@ const TestPlayerPage_20260504 = () => {
         'In what I just heard, the tempo matched my need.',
         'In what I just heard, the tempo felt natural.',
         'It took effort to go through this sequence.',
-        'What is your energy level right now? (0-10)',
-        'What is your stress level?',
+        'What is your energy level right now?',
+        'What is your stress level right now?',
     ];
     const afterBlockSurveyInputTypes = ['scale', 'scale', 'scale', 'scale', 'scale'];
     const afterBlockSurveyQuestionKinds = [
@@ -246,8 +224,8 @@ const TestPlayerPage_20260504 = () => {
     const initialSurveyQuestions = [
         'Did you consume caffeine or alcohol in the last few hours?',
         'How did you sleep last night?',
-        'What is your stress level?',
-        'What is your energy level right now? (0-10)',
+        'What is your stress level right now?',
+        'What is your energy level right now?',
         'Where are you right now?',
         'Please specify',
         'Are you using headphones?',
@@ -275,7 +253,7 @@ const TestPlayerPage_20260504 = () => {
         ['Very poorly', 'Poorly', 'Okay', 'Well', 'Very well'],
         [],
         [],
-        ['In the car', 'At home', 'Outdoors', 'At work', 'Other'],
+        ['Commuting', 'At home', 'Outdoors', 'At work', 'Other'],
         [],
         ['Yes', 'No'],
     ];
@@ -317,10 +295,14 @@ const TestPlayerPage_20260504 = () => {
                 ];
             }
             if (modeName === 'Mode A') {
-                return ['In this sequence the music tempo is not adjustable.'];
+                return [
+                    'In this sequence, the tempo stays fixed during playback. Just listen normally.',
+                ];
             }
             if (modeName === 'Mode B') {
-                return ['In this sequence the music tempo is not adjustable.'];
+                return [
+                    'In this sequence, the tempo may adjust automatically during playback. You do not need to do anything.',
+                ];
             }
             return [];
         })();
@@ -368,6 +350,7 @@ const TestPlayerPage_20260504 = () => {
                 const fileName = track.file_name;
                 return {
                     id: `test-seq-${trackId}`,
+                    track_id: trackId,
                     songId: trackId,
                     name: `${title} - ${artist}`,
                     title,
@@ -483,7 +466,7 @@ const TestPlayerPage_20260504 = () => {
         }
         const trackIds = sequenceConfig?.trackIds;
         const ordered = trackIds?.length
-            ? buildSequencePlaylist(catalogTrackRows, trackIds, (track) => track.songId)
+            ? buildSequencePlaylist(catalogTrackRows, trackIds, (track) => track.track_id ?? track.songId)
             : catalogTrackRows;
         setPlaylist(ordered);
         setCurrentTrackIndex(-1);
@@ -533,6 +516,11 @@ const TestPlayerPage_20260504 = () => {
         }
     };
 
+    const endCurrentSequenceTrackPlayback = useCallback(() => {
+        playbackAnalyticsRef.current?.setTrackSwitching?.(true);
+        void playbackAnalyticsRef.current?.endPlaybackSession?.('sequence_track_completed');
+    }, []);
+
     const scheduleNextTrackTransition = () => {
         clearBlockTrackTimer();
         const step = blockTrackStepRef.current;
@@ -548,6 +536,7 @@ const TestPlayerPage_20260504 = () => {
         const audioEl = audioRef.current;
         if (!track?.url || !audioEl) return;
         isAutoSwitchingTrackRef.current = true;
+        playbackAnalyticsRef.current?.setTrackSwitching?.(true);
 
         const finalizeSwitchAttempt = () => {
             isAutoSwitchingTrackRef.current = false;
@@ -588,6 +577,8 @@ const TestPlayerPage_20260504 = () => {
     };
 
     const playNextTrackInBlock = () => {
+        endCurrentSequenceTrackPlayback();
+
         const nextStep = blockTrackStepRef.current + 1;
         if (nextStep >= playlist.length) {
             clearBlockTrackTimer();
@@ -621,6 +612,8 @@ const TestPlayerPage_20260504 = () => {
                     key={`sequence-mode-${currentAdaptationModeIndex}-${reactionPolicyInstance.policyId || 'policy'}`}
                     selectedFile={selectedFile}
                     sessionName="TestPlayer_20260504"
+                    adaptationMode={currentAdaptationMode}
+                    playbackAnalyticsRef={playbackAnalyticsRef}
                     audioRef={audioRef}
                     thumbBpmControlRef={thumbBpmControlRef}
                     initialReactionPolicyInstance={reactionPolicyInstance}
@@ -636,11 +629,11 @@ const TestPlayerPage_20260504 = () => {
                     enableStopButton={false}
                     showTutorialButton={true}
                     onTutorialButtonClick={() => setShowSequenceTutorial(true)}
+                    enableMappingsButton={false}
                     sensingHeaderContent={
                         <ModeCThumbTempoOverrideButtons
                             show={currentAdaptationMode === 'Mode C'}
                             thumbBpmControlRef={thumbBpmControlRef}
-                            onTempoStep={handleModeCTempoStep}
                         />
                     }
                 >
@@ -667,6 +660,7 @@ const TestPlayerPage_20260504 = () => {
                         inputTypes={evaluationInputTypes}
                         questionKinds={evaluationQuestionKinds}
                         choiceOptions={evaluationChoiceOptions}
+                        rankingSlotLabels={evaluationRankingSlotLabels}
                         optionalQuestionIndices={[5, 6, 7]}
                         experimentId={experimentId}
                         formMetadata={currentExperimentMetadata}
@@ -712,6 +706,16 @@ const TestPlayerPage_20260504 = () => {
                 }}
                 disableSubmission={false}
             />
+            {showTestRequirements && (
+                <TutorialMessage
+                    messages="For this test, you will need a computer, audio on and a webcam. You will need to give permission for the application to use your webcam."
+                    position="center"
+                    onClose={() => {
+                        setShowTestRequirements(false);
+                        setShowInitialEnergySurvey(true);
+                    }}
+                />
+            )}
             <Forms
                 questions={initialSurveyQuestions}
                 inputTypes={initialSurveyInputTypes}

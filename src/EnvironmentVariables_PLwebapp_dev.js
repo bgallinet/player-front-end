@@ -1,7 +1,7 @@
 //Powershell command for getting the API gateway URL:
 // aws apigateway get-rest-apis --query "items[*].[id,name]" --output text | ForEach-Object { $parts = $_ -split '\s+'; $apiId = $parts[0]; $apiName = $parts[1]; $stages = aws apigateway get-stages --rest-api-id $apiId --query "item[*].stageName" --output text; $stages -split '\s+' | ForEach-Object { Write-Output "$apiName - https://$apiId.execute-api.us-east-1.amazonaws.com/$_" } }
 
-const API_gateway_url = "https://s70no2w5sg.execute-api.eu-west-3.amazonaws.com/player-dev-stage-hjkl1qok"; // To be changed
+const API_gateway_url = "https://meinbtwdw7.execute-api.eu-west-3.amazonaws.com/player-dev-stage-8cj3gcgb"; // To be changed
 
 
 // WebSocket URLs (without protocol - will be auto-detected based on page protocol)

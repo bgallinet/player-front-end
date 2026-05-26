@@ -67,7 +67,8 @@ export async function fetchLatestEnergySurveyFromUserEndpoint(idToken) {
     }
 }
 
-export function computeEnergySurveySimplifyBpmKeyShift(params = {}) {
+/** Tempo-only BPM shift % from intro energy survey (pitch preserved — same path as Mode C thumb tempo). */
+export function computeEnergySurveyBpmShiftPercent(params = {}) {
     if (typeof window === 'undefined') return 0;
     const baseMultiplier = Number(params.base_multiplier ?? 0.85);
     const energyScale = Number(params.energy_scale ?? 0.3);
@@ -78,6 +79,11 @@ export function computeEnergySurveySimplifyBpmKeyShift(params = {}) {
     if (!Number.isFinite(energySurvey)) return 0;
     const bpmAdapted = baseMultiplier * originalBpm + (energySurvey / energyDivisor) * energyScale * originalBpm;
     return ((bpmAdapted - originalBpm) / originalBpm) * 100;
+}
+
+/** @deprecated Use {@link computeEnergySurveyBpmShiftPercent} — kept for legacy rule type names. */
+export function computeEnergySurveySimplifyBpmKeyShift(params = {}) {
+    return computeEnergySurveyBpmShiftPercent(params);
 }
 
 /**
@@ -95,17 +101,17 @@ export function compileDeclarativeRuleDescriptors(descriptors) {
         const priority = Number(d.priority) || 0;
         const params = d.params && typeof d.params === 'object' ? d.params : {};
 
-        if (type === 'energy_survey_simplify_bpm_key_shift' || type === 'energy_survey_bpm') {
+        if (
+            type === 'energy_survey_bpm' ||
+            type === 'energy_survey_simplify_bpm_key_shift'
+        ) {
             rules.push({
                 id,
                 priority,
                 when: () => true,
                 patch: {
-                    get simplifyBpmKeyShift() {
-                        return computeEnergySurveySimplifyBpmKeyShift(params);
-                    },
-                    get bpmKeyShiftPercent() {
-                        return computeEnergySurveySimplifyBpmKeyShift(params);
+                    get bpmShiftPercent() {
+                        return computeEnergySurveyBpmShiftPercent(params);
                     },
                 },
             });

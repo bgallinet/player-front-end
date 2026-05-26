@@ -7,14 +7,22 @@ import TypewriterText from '../styles/TypewriterText';
 import { secondaryColor } from '../utils/DisplaySettings';
 import { trackPageView } from '../hooks/pageViewTracker';
 import { usePlayerAuthStatus } from '../hooks/usePlayerAuthStatus';
-import { PLAYER_DESTINATIONS } from '../utils/playerAuthConfig';
+import {
+    getHomePlayerDestinations,
+    PLAYER_DESTINATIONS,
+} from '../utils/playerAuthConfig';
 
 const Home = () => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const code = urlParams.get('code');
     const { handleLogout } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
+    const searchParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
+    const code = searchParams.get('code');
+    const showPlayerParam = searchParams.get('show_player');
+    const homePlayerDestinations = useMemo(
+        () => getHomePlayerDestinations(showPlayerParam),
+        [showPlayerParam],
+    );
 
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
@@ -162,7 +170,7 @@ const Home = () => {
                                 />
 
                                 <div className="d-flex flex-column align-items-center gap-3 mb-3">
-                                    {PLAYER_DESTINATIONS.map((destination) => {
+                                    {homePlayerDestinations.map((destination) => {
                                         const style = destination.style || {
                                             borderColor: secondaryColor,
                                         };

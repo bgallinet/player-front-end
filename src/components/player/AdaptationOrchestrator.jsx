@@ -148,12 +148,16 @@ const AdaptationOrchestrator = ({
             return undefined;
         }
         thumbBpmControlRef.current = {
-            applyStep: (direction) => {
+            applyStep: (direction, options = {}) => {
                 const stepBpm = resolveThumbTempoStepBpm(policyBundleRef.current);
                 applyThumbTempoStep(persistentThumbBpmStateRef.current, direction, stepBpm);
                 const output = flushReactionCompile();
                 if (onReactionOutput && output) {
-                    onReactionOutput(output);
+                    onReactionOutput({
+                        ...output,
+                        tempoChangeSource: options.source === 'button' ? 'button' : 'thumb',
+                        tempoDirection: direction,
+                    });
                 }
             },
         };

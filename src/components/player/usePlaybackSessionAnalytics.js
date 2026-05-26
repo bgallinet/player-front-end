@@ -27,12 +27,37 @@ const persistPlaybackDebug = (label, payload = {}) => {
     }
 };
 
-export function usePlaybackSessionAnalytics({ sessionName, resolveTrackName }) {
+export function usePlaybackSessionAnalytics({
+    sessionName,
+    resolveTrackName,
+    resolveTrackId,
+    /** Optional per-session extras merged into metadata.experiment_config (e.g. Mode B BPM). */
+    resolvePlaybackExperimentConfig,
+}) {
     const playbackSessionActiveRef = useRef(false);
     const playbackSessionStartMsRef = useRef(0);
     const playbackSessionHeartbeatRef = useRef(null);
     const unloadFlushSentRef = useRef(false);
     const isPageTerminatingRef = useRef(false);
+
+    const buildPlaybackMetadata = useCallback(() => {
+        const trackId = resolveTrackId?.() ?? null;
+        const metadata = trackId
+            ? { track_id: trackId, song_name: resolveTrackName() }
+            : {};
+
+        const experimentConfig = resolvePlaybackExperimentConfig?.();
+        if (
+            experimentConfig &&
+            typeof experimentConfig === 'object' &&
+            !Array.isArray(experimentConfig) &&
+            Object.keys(experimentConfig).length > 0
+        ) {
+            metadata.experiment_config = experimentConfig;
+        }
+
+        return Object.keys(metadata).length > 0 ? metadata : undefined;
+    }, [resolvePlaybackExperimentConfig, resolveTrackId, resolveTrackName]);
 
     const persistPlaybackSnapshot = useCallback((lastSeenAtMs = Date.now()) => {
         if (!playbackSessionActiveRef.current || !playbackSessionStartMsRef.current) {
@@ -112,6 +137,7 @@ export function usePlaybackSessionAnalytics({ sessionName, resolveTrackName }) {
             end_reason: endReason,
             started_at_ms: startedAt,
             ended_at_ms: endedAt,
+            metadata: buildPlaybackMetadata(),
         };
 
         if (isPageTerminatingRef.current || document.visibilityState === 'hidden') {
@@ -124,7 +150,7 @@ export function usePlaybackSessionAnalytics({ sessionName, resolveTrackName }) {
         debugPlaybackAnalytics('end-async', analyticsPayload);
         persistPlaybackDebug('end-async', analyticsPayload);
         await trackSimpleEvent(analyticsPayload);
-    }, [resolveTrackName, sessionName]);
+    }, [buildPlaybackMetadata, resolveTrackName, sessionName]);
 
     const flushPlaybackSessionOnUnload = useCallback((endReason) => {
         if (!playbackSessionActiveRef.current || !playbackSessionStartMsRef.current) {
@@ -172,6 +198,7 @@ export function usePlaybackSessionAnalytics({ sessionName, resolveTrackName }) {
             end_reason: endReason,
             started_at_ms: startedAt,
             ended_at_ms: endedAt,
+            metadata: buildPlaybackMetadata(),
         };
 
         // Keep a pending snapshot so next launch can recover if keepalive delivery fails on close.
@@ -191,7 +218,7 @@ export function usePlaybackSessionAnalytics({ sessionName, resolveTrackName }) {
         }
 
         trackSimpleEventOnUnload(analyticsPayload);
-    }, [resolveTrackName, sessionName]);
+    }, [buildPlaybackMetadata, resolveTrackName, sessionName]);
 
     useEffect(() => {
         if (process.env.NODE_ENV !== 'production') {

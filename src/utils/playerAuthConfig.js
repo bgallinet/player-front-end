@@ -48,6 +48,34 @@ export const PLAYER_DESTINATIONS = [
     },
 ];
 
+/** Homepage when `show_player` is absent — public test entry only. */
+export const HOME_PLAYER_DESTINATION_IDS_DEFAULT = ['test20260504'];
+
+/** Homepage when `?show_player=all`. */
+export const HOME_PLAYER_DESTINATION_IDS_ALL = ['local', 'test20260518', 'spotify', 'soundcloud'];
+
+/** `show_player` query values → destination ids (see PLAYER_DESTINATIONS). */
+export const HOME_SHOW_PLAYER_PARAM_TO_DESTINATION_IDS = Object.freeze({
+    all: HOME_PLAYER_DESTINATION_IDS_ALL,
+    local: ['local'],
+    spotify: ['spotify'],
+    soundcloud: ['soundcloud'],
+    '20260504': ['test20260504'],
+    '20260518': ['test20260518'],
+});
+
+/**
+ * Player buttons shown on the homepage for the current `show_player` URL param.
+ * @param {string|null|undefined} showPlayerParam — e.g. `all`, `local`, `spotify`, `20260504`
+ */
+export function getHomePlayerDestinations(showPlayerParam) {
+    const param = typeof showPlayerParam === 'string' ? showPlayerParam.trim() : '';
+    const ids =
+        (param && HOME_SHOW_PLAYER_PARAM_TO_DESTINATION_IDS[param]) ||
+        HOME_PLAYER_DESTINATION_IDS_DEFAULT;
+    return PLAYER_DESTINATIONS.filter((d) => ids.includes(d.id));
+}
+
 export function getPlayerDestinationByPath(pathname) {
     return PLAYER_DESTINATIONS.find((d) => d.path === pathname) || null;
 }

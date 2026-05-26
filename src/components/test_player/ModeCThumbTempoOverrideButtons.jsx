@@ -19,8 +19,8 @@ const ModeCThumbTempoOverrideButtons = ({ show = false, thumbBpmControlRef, onTe
     }
 
     const applyStep = (direction) => {
+        thumbBpmControlRef?.current?.applyStep?.(direction, { source: 'button' });
         onTempoStep?.(direction);
-        thumbBpmControlRef?.current?.applyStep?.(direction);
     };
 
     const buttonStyle = {

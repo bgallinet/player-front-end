@@ -19,7 +19,7 @@ export const MODE_C_THUMB_TEMPO_STEP_BPM = 5;
  */
 
 /**
- * @typedef {{ applyStep: (direction: ThumbTempoDirection) => void } | null} ThumbBpmControlHandle
+ * @typedef {{ applyStep: (direction: ThumbTempoDirection, options?: { source?: 'button' | 'thumb' }) => void } | null} ThumbBpmControlHandle
  */
 
 /** @returns {ThumbBpmPersistentState} */
