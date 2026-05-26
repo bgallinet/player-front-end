@@ -18,7 +18,7 @@ const falseFn = () => false;
 
 export const DeckControls = ({
     deckId,
-    currentSongId = null,
+    currentTrackId = null,
     currentSongArtist = '',
     loadedTrackName = '',
     analyticsSessionName = 'default',
@@ -49,18 +49,20 @@ export const DeckControls = ({
     setTutorialDismissed,
     /** Cover / artwork (URL string), e.g. SoundCloud `artwork_url` */
     artworkUrl,
+    /** When false, no cover image is shown above transport controls. */
+    showArtwork = true,
     artworkSizePx = 120,
     /** Optional status line (e.g. stream loading) */
     trackStatusMessage,
     trackStatusLoading = false
 }) => {
-    const [artworkSrc, setArtworkSrc] = useState(
-        () => artworkUrl || defaultDeckArtwork
+    const [artworkSrc, setArtworkSrc] = useState(() =>
+        showArtwork ? artworkUrl || defaultDeckArtwork : null,
     );
 
     useEffect(() => {
-        setArtworkSrc(artworkUrl || defaultDeckArtwork);
-    }, [artworkUrl]);
+        setArtworkSrc(showArtwork ? artworkUrl || defaultDeckArtwork : null);
+    }, [artworkUrl, showArtwork]);
 
     const handleArtworkError = useCallback(() => {
         setArtworkSrc((prev) => (prev === defaultDeckArtwork ? prev : defaultDeckArtwork));
@@ -97,58 +99,54 @@ export const DeckControls = ({
         [deckId, analyticsSessionName]
     );
 
-    const songMeta = useMemo(
+    const trackMeta = useMemo(
         () => ({
-            song_id:
-                currentSongId !== null && currentSongId !== undefined && currentSongId !== ''
-                    ? String(currentSongId)
-                    : '',
+            track_id:
+                currentTrackId !== null && currentTrackId !== undefined && currentTrackId !== ''
+                    ? String(currentTrackId)
+                    : null,
             song_name: loadedTrackName || '',
             song_artist: currentSongArtist || '',
         }),
-        [currentSongId, loadedTrackName, currentSongArtist]
+        [currentTrackId, loadedTrackName, currentSongArtist]
     );
 
     const handlePlayPauseClick = useCallback(() => {
         const control = isPlaying ? 'pause' : 'play';
         trackDeckControlClick(control, {
-            ...songMeta,
+            ...trackMeta,
             was_playing: isPlaying,
         });
         onPlayPause();
-    }, [isPlaying, onPlayPause, trackDeckControlClick, songMeta]);
+    }, [isPlaying, onPlayPause, trackDeckControlClick, trackMeta]);
 
     const handleStopClick = useCallback(() => {
         trackDeckControlClick('stop', {
-            ...songMeta,
+            ...trackMeta,
             was_playing: isPlaying,
         });
         onStop();
-    }, [isPlaying, onStop, trackDeckControlClick, songMeta]);
+    }, [isPlaying, onStop, trackDeckControlClick, trackMeta]);
 
     const handlePreviousClick = useCallback(() => {
         trackDeckControlClick('previous', {
+            ...trackMeta,
             previous_song_name: loadedTrackName || '',
-            previous_song_id:
-                currentSongId !== null && currentSongId !== undefined && currentSongId !== ''
-                    ? String(currentSongId)
-                    : '',
+            previous_track_id: trackMeta.track_id,
             has_previous: hasPrevious,
         });
         onPrevious();
-    }, [hasPrevious, onPrevious, trackDeckControlClick, loadedTrackName, currentSongId]);
+    }, [hasPrevious, onPrevious, trackDeckControlClick, loadedTrackName, trackMeta]);
 
     const handleNextClick = useCallback(() => {
         trackDeckControlClick('next', {
+            ...trackMeta,
             previous_song_name: loadedTrackName || '',
-            previous_song_id:
-                currentSongId !== null && currentSongId !== undefined && currentSongId !== ''
-                    ? String(currentSongId)
-                    : '',
+            previous_track_id: trackMeta.track_id,
             has_next: hasNext,
         });
         onNext();
-    }, [hasNext, onNext, trackDeckControlClick, loadedTrackName, currentSongId]);
+    }, [hasNext, onNext, trackDeckControlClick, loadedTrackName, trackMeta]);
 
     const handleAudioDeviceClick = useCallback(() => {
         trackDeckControlClick('audio_settings');
@@ -243,7 +241,7 @@ export const DeckControls = ({
                     )}
                 </div>
             )}
-            {artworkSrc && (
+            {showArtwork && artworkSrc && (
                 <div className="text-center" style={{ marginTop: '0.15rem', marginBottom: '0.35rem' }}>
                     <img
                         src={artworkSrc}

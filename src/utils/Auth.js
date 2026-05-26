@@ -1,4 +1,4 @@
-import EnvironmentVariables from './EnvironmentVariables';
+import EnvironmentVariables from '../EnvironmentVariables';
 
 const COGNITO_HOSTED_UI = 'https://d3o5hrtbl653it.auth.eu-west-3.amazoncognito.com';
 

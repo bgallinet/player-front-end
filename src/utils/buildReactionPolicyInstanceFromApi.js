@@ -11,8 +11,15 @@ import { compileDeclarativeRuleDescriptors } from '../music_adaptation/policy/se
 export function buildReactionPolicyInstanceFromApi(apiPayload) {
     const bundle = normalizeReactionPolicyBundle(apiPayload.bundle);
     const descriptors = apiPayload.bundle?.declarativeRules;
+    const rawBundle = apiPayload.bundle && typeof apiPayload.bundle === 'object' ? apiPayload.bundle : {};
+    const catalogTrackSelection =
+        rawBundle.catalogTrackSelection && typeof rawBundle.catalogTrackSelection === 'object'
+            ? rawBundle.catalogTrackSelection
+            : null;
+
     return {
         ...bundle,
+        catalogTrackSelection,
         declarativeRules: compileDeclarativeRuleDescriptors(
             Array.isArray(descriptors) ? descriptors : [],
         ),

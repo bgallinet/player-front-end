@@ -1,9 +1,45 @@
 import AnalyticsAPI from '../utils/AnalyticsAPI';
 import UserAPI from '../utils/UserAPI';
 import { createAuthenticatedRequestBody } from './sessionUtils';
-import EnvironmentVariables from '../utils/EnvironmentVariables';
+import EnvironmentVariables from '../EnvironmentVariables';
 import { enrichAnalyticsRequestBody } from '../utils/clientEnvironment';
 import { mergeActiveExperimentIntoAnalyticsRequestBody } from '../utils/experimentSession';
+import { playbackFieldsForAnalytics } from '../utils/activePlaybackTrack';
+
+function enrichEventDataWithActivePlayback(eventData) {
+    const playback = playbackFieldsForAnalytics();
+    if (!playback.track_id) {
+        return eventData;
+    }
+
+    const out = { ...eventData };
+    const meta =
+        out.metadata && typeof out.metadata === 'object' && !Array.isArray(out.metadata)
+            ? { ...out.metadata }
+            : {};
+
+    for (const [key, value] of Object.entries(playback)) {
+        if (meta[key] == null || meta[key] === '') {
+            meta[key] = value;
+        }
+    }
+
+    if (out.context && typeof out.context === 'object' && !Array.isArray(out.context)) {
+        const ctx = { ...out.context };
+        for (const [key, value] of Object.entries(playback)) {
+            if (ctx[key] == null || ctx[key] === '') {
+                ctx[key] = value;
+            }
+        }
+        out.context = ctx;
+        if (meta.track_id == null || meta.track_id === '') {
+            meta.track_id = ctx.track_id ?? playback.track_id;
+        }
+    }
+
+    out.metadata = meta;
+    return out;
+}
 
 /**
  * Simple event tracking utility without experiment dependencies
@@ -11,16 +47,17 @@ import { mergeActiveExperimentIntoAnalyticsRequestBody } from '../utils/experime
  */
 export const trackSimpleEvent = async (eventData) => {
     try {
-        console.log('📊 Tracking simple event:', eventData);
-        
+        const enriched = enrichEventDataWithActivePlayback(eventData);
+        console.log('📊 Tracking simple event:', enriched);
+
         const requestBody = {
             request_type: 'analytics',
-            interaction_type: eventData.interaction_type,
-            session_name: eventData.session_name || 'default',
-            element_id: eventData.element_id,
-            page_url: eventData.page_url || window.location.href,
-            duration_ms: eventData.detection_duration || eventData.duration_ms,
-            ...eventData // Include any additional data
+            interaction_type: enriched.interaction_type,
+            session_name: enriched.session_name || 'default',
+            element_id: enriched.element_id,
+            page_url: enriched.page_url || window.location.href,
+            duration_ms: enriched.detection_duration || enriched.duration_ms,
+            ...enriched,
         };
 
         const isAuthenticated = Boolean(localStorage.getItem('idToken'));
@@ -47,14 +84,15 @@ export const trackSimpleEvent = async (eventData) => {
  */
 export const trackSimpleEventOnUnload = (eventData) => {
     try {
+        const enriched = enrichEventDataWithActivePlayback(eventData);
         const requestBody = {
             request_type: 'analytics',
-            interaction_type: eventData.interaction_type,
-            session_name: eventData.session_name || 'default',
-            element_id: eventData.element_id,
-            page_url: eventData.page_url || window.location.href,
-            duration_ms: eventData.detection_duration || eventData.duration_ms,
-            ...eventData
+            interaction_type: enriched.interaction_type,
+            session_name: enriched.session_name || 'default',
+            element_id: enriched.element_id,
+            page_url: enriched.page_url || window.location.href,
+            duration_ms: enriched.detection_duration || enriched.duration_ms,
+            ...enriched,
         };
 
         const isAuthenticated = Boolean(localStorage.getItem('idToken'));

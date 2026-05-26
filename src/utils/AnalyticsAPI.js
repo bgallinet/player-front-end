@@ -1,5 +1,5 @@
 import PublicAPICall from './PublicAPICall';
-import EnvironmentVariables from './EnvironmentVariables';
+import EnvironmentVariables from '../EnvironmentVariables';
 import { enrichAnalyticsRequestBody } from './clientEnvironment';
 import { mergeActiveExperimentIntoAnalyticsRequestBody } from './experimentSession';
 

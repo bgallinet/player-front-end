@@ -85,6 +85,7 @@ export default function UserProfileForm({ show, onHide, introText = DEFAULT_INTR
             sessionName="user_listening_profile"
             formMetadata={{ survey_id: 'listening_profile_v1' }}
             persistListeningProfileToUserProfile
+            requireGdprConsent
         />
     );
 }

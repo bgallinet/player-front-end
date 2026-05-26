@@ -1,14 +1,14 @@
 import { useEffect, useRef, useCallback } from 'react';
-import { runReactionCompile } from '../music_adaptation/policy/runReactionCompile';
-import { reactionOutputsDiffer } from '../music_adaptation/policy/reactionOutputDiff';
+import { runReactionCompile } from '../policy/runReactionCompile';
+import { reactionOutputsDiffer } from '../policy/reactionOutputDiff';
 
 /**
  * Phase 3 — policy compile tick: ring buffer → recommendation + intents + commands.
  * Sensing frames must be written to `bufferRef` separately (e.g. `ingestSensingFeedIntoBuffer`).
  *
  * @param {{
- *   policyBundleRef: React.MutableRefObject<import('../music_adaptation/policy/reactionPolicyBundle').ReactionPolicyBundleSnapshot>,
- *   bufferRef: React.MutableRefObject<import('../music_adaptation/timeline/CueRingBuffer').CueRingBuffer|null>,
+ *   policyBundleRef: React.MutableRefObject<import('../policy/reactionPolicyBundle').ReactionPolicyBundleSnapshot>,
+ *   bufferRef: React.MutableRefObject<import('../timeline/CueRingBuffer').CueRingBuffer|null>,
  *   prevDominantFaceToneRef: React.MutableRefObject<string|null>,
  *   persistentThumbBpmStateRef?: React.MutableRefObject<{ persistentDeltaBpm: number, prevThumbUpActive: boolean, prevThumbDownActive: boolean }>,
  *   analysisWindowMs: number,
@@ -23,7 +23,7 @@ import { reactionOutputsDiffer } from '../music_adaptation/policy/reactionOutput
  *     },
  *   ) => void,
  *   nodTrackBpmAudioRef?: React.MutableRefObject<({ detectedTrackBpm?: number | null } & HTMLMediaElement) | null>,
- *   latestSensingFeedRef?: React.MutableRefObject<import('../music_adaptation/feeds/reactionSensingFeed').ReactionSensingFeedSnapshot>,
+ *   latestSensingFeedRef?: React.MutableRefObject<import('../feeds/reactionSensingFeed').ReactionSensingFeedSnapshot>,
  * }} args
  */
 export function usePlaybackPolicy({

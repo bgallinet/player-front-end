@@ -290,7 +290,7 @@ const SoundCloudPlayerPage = () => {
         <>
             <Player
                 selectedFile={selectedFile}
-                pageName="soundcloud-player"
+                sessionName="SoundCloudPlayer"
                 audioRef={audioRef}
                 deckBAudioRef={deckBAudioRef}
                 playlist={playlist}

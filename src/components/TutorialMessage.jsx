@@ -1,14 +1,10 @@
 import React, { useState } from 'react';
 import { Button } from 'react-bootstrap';
-import { useTutorial } from '../contexts/TutorialContext';
 import tutorialIcon from '../images/tutorialicon.png';
 import TypewriterText from '../styles/TypewriterText';
 
-const TutorialMessage = ({ messages, position = 'top-center', onClose, forceShow = false }) => {
-    const { isTutorialMode } = useTutorial();
+const TutorialMessage = ({ messages, position = 'top-center', onClose }) => {
     const [currentMessageIndex, setCurrentMessageIndex] = useState(0);
-
-    if (!forceShow && !isTutorialMode) return null;
 
     // Handle single string input for backward compatibility
     const messageArray = Array.isArray(messages) ? messages : [messages];

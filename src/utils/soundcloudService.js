@@ -13,7 +13,7 @@
  * and set SC_ClientID / SC_ClientSecret in the corresponding EnvironmentVariables file.
  */
 
-import EnvironmentVariables from './EnvironmentVariables';
+import EnvironmentVariables from '../EnvironmentVariables';
 import { soundCloudTrackIdForApi, unwrapLikedTrackRow } from './soundcloudTrackId';
 
 export { soundCloudTrackIdForApi };

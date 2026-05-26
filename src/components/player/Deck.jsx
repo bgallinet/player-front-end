@@ -27,6 +27,8 @@ const Deck = ({
     consoleZIndex = 1045,
     /** Top-right control opens mappings (not the sound console). */
     onOpenMappings,
+    /** When false, hides the Mappings toolbar button (e.g. participant test pages). */
+    showMappingsButton = true,
     /** Optional controlled sound console visibility (used when opening console from deck toolbar). */
     soundConsoleOpen: soundConsoleOpenProp,
     onSoundConsoleOpenChange
@@ -95,21 +97,19 @@ const Deck = ({
     return (
         <>
             <StyledCard className="mb-0" style={{ position: 'relative', zIndex: 0, overflow: 'visible' }}>
-                <div className="d-flex align-items-center justify-content-end mb-2 flex-wrap gap-2">
-                    <Button
-                        variant="outline-light"
-                        size="sm"
-                        type="button"
-                        onClick={() => {
-                            if (onOpenMappings) {
-                                onOpenMappings();
-                            }
-                        }}
-                        style={{ borderColor: secondaryColor }}
-                    >
-                        Mappings
-                    </Button>
-                </div>
+                {showMappingsButton && onOpenMappings && (
+                    <div className="d-flex align-items-center justify-content-end mb-2 flex-wrap gap-2">
+                        <Button
+                            variant="outline-light"
+                            size="sm"
+                            type="button"
+                            onClick={() => onOpenMappings()}
+                            style={{ borderColor: secondaryColor }}
+                        >
+                            Mappings
+                        </Button>
+                    </div>
+                )}
                 {children}
             </StyledCard>
 

@@ -1,4 +1,4 @@
-import EnvironmentVariables from './EnvironmentVariables';
+import EnvironmentVariables from '../EnvironmentVariables';
 
 /**
  * Load adaptation policy bundle for an experiment variant from `/info`.

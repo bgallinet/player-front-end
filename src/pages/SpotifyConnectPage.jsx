@@ -6,7 +6,9 @@ import {
     getAuthUrl,
 } from '../utils/spotifyService';
 
-export const RETURN_ORIGIN_KEY = 'sp_return_origin';
+import { SPOTIFY_RETURN_ORIGIN_KEY } from '../utils/spotifyAuthBridge';
+
+export const RETURN_ORIGIN_KEY = SPOTIFY_RETURN_ORIGIN_KEY;
 
 const SpotifyConnectPage = () => {
     const startedRef = useRef(false);
@@ -19,7 +21,7 @@ const SpotifyConnectPage = () => {
             const params = new URLSearchParams(window.location.search);
             const returnOrigin = params.get('return_origin');
             if (returnOrigin) {
-                sessionStorage.setItem(RETURN_ORIGIN_KEY, returnOrigin);
+                sessionStorage.setItem(SPOTIFY_RETURN_ORIGIN_KEY, returnOrigin);
             }
 
             const codeVerifier = generateCodeVerifier();
