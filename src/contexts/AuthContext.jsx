@@ -20,6 +20,7 @@ export function AuthProvider({ children }) {
   const [refreshToken, setRefreshToken] = useState(null);
   const [refreshTimer, setRefreshTimer] = useState(null);
   const [error, setError] = useState(null);
+  const [isAuthInitializing, setIsAuthInitializing] = useState(true);
 
   const clearError = () => setError(null);
 
@@ -193,6 +194,8 @@ export function AuthProvider({ children }) {
       }
     } catch (error) {
       handleAuthError(error, AUTH_ERRORS.INVALID_TOKEN);
+    } finally {
+      setIsAuthInitializing(false);
     }
   }, []);
 
@@ -205,6 +208,7 @@ export function AuthProvider({ children }) {
       handleLogout,
       error,
       clearError,
+      isAuthInitializing,
     }}>
       {children}
     </AuthContext.Provider>

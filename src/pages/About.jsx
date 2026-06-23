@@ -1,6 +1,6 @@
 import React from 'react';
 import { Container, Row, Col } from 'react-bootstrap';
-import { StyledCard } from '../utils/StyledComponents';
+import { StyledCard } from '../styles/StyledComponents';
 
 const About = () => {
     return (
@@ -11,7 +11,7 @@ const About = () => {
                         <h1 className="mb-4">About TuneTribes</h1>
                         
                         <p className="mb-4">
-                            <strong>Version:</strong> ed44f842| <strong>Last updated:</strong> 2025-11-10</p>
+                            <strong>Version:</strong> 72ff8c29| <strong>Last updated:</strong> 2026-05-23</p>
 
                         <p className="mb-4">
                             TuneTribes is an innovative real-time music streaming and audience engagement platform that combines cutting-edge emotion detection technology with interactive music experiences. Our platform enables creators and fans to connect through music with real-time facial expression analysis and dynamic audio processing.
@@ -27,6 +27,9 @@ const About = () => {
                             <li>Session creation and attendance management</li>
                             <li>Real-time analytics and emotion tracking</li>
                         </ul>
+                        <p className="mb-4">
+                            The local folder player supports common audio formats: .mp3, .wav, .flac, .m4a, .aac, .ogg, .wma, .aiff, and .au.
+                        </p>
 
                         <h2 className="mb-3">Technology Stack</h2>
                         <p>TuneTribes is built using modern web technologies:</p>

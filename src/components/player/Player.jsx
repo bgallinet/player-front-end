@@ -1,39 +1,46 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Container, Alert } from 'react-bootstrap';
-import { Text, StyledCard } from '../../utils/StyledComponents';
+import { Container, Alert, Button } from 'react-bootstrap';
+import { Text } from '../../styles/StyledComponents';
 import { secondaryColor } from '../../utils/DisplaySettings';
-import FacialLandmarkUserUI from '../sensing/FacialLandmarkUserUI';
-import BodyPoseUserUI from '../sensing/BodyPoseUserUI';
-import TutorialMessage from '../TutorialMessage';
-import SoundConsole from '../audio_processing/SoundConsole';
-import AudioControls from './AudioControls';
+import Deck from './Deck';
+import DeckControls from './DeckControls';
 import AudioDeviceSelector from './AudioDeviceSelector';
 import ManualMapping from './ManualMapping';
-import ReactionToSoundMapper, { 
-    DEFAULT_EQ_MAPPINGS, 
-    DEFAULT_VOLUME_MAPPINGS, 
-    DEFAULT_RHYTHMIC_ENHANCEMENT_MAPPINGS,
-    DEFAULT_REVERB_MAPPINGS,
-    DEFAULT_DELAY_MAPPINGS,
-    EQ_PRESETS
-} from './ReactionToSoundMapper';
-import { useTutorial } from '../../contexts/TutorialContext';
-import SettingsButton from '../../utils/SettingsButton';
-import ExpandReduceButton from '../../utils/ExpandReduceButton';
-import { getDemoUsername, isDemoSession } from '../../hooks/demoUserManager';
+import AdaptationOrchestrator, {
+    createBuiltinStaticReactionPolicyInstance,
+    EQ_PRESETS,
+} from './AdaptationOrchestrator';
+import AudioDeviceButton from '../../buttons/AudioDeviceButton';
+import SettingsButton from '../../buttons/SettingsButton';
 import { trackPageView } from '../../hooks/pageViewTracker';
+import { trackSimpleEvent } from '../../hooks/simpleTracker';
+import { resolveTrackIdFromSources } from '../../utils/resolveTrackId';
+import { setActivePlaybackTrack } from '../../utils/activePlaybackTrack';
+import logoSmall from '../../images/logo_small.png';
+import { useAudioGraphCompiler } from '../../hooks/useAudioGraphCompiler';
+import { usePlaybackSessionAnalytics } from './usePlaybackSessionAnalytics';
+import { useDeckTransport } from './useDeckTransport';
+
+function resolveDeckArtworkUrl(source) {
+    if (!source?.artwork_url || typeof source.artwork_url !== 'string') {
+        return null;
+    }
+    const url = source.artwork_url;
+    return url.includes('-large') ? url.replace('-large', '-t300x300') : url;
+}
 
 const Player = ({
     // Audio source
     selectedFile,
-    isDemoTrack = false,
     audioRef: externalAudioRef,
+    deckBAudioRef: externalDeckBAudioRef,
     
     // Playlist functionality (for LocalPlayer)
     playlist = [],
     currentTrackIndex = -1,
     onPlaylistChange,
     onTrackSelect,
+    onLoadDeckBTrack,
     
     // Music event handlers
     onMusicPlay,
@@ -41,83 +48,159 @@ const Player = ({
     
     // Additional content to render above audio controls
     children,
+    /** Optional content rendered above deck controls (e.g. fixed sequence playlist). */
+    topContent = null,
     
-    // Page tracking
-    pageName = 'player'
+    /** Analytics session id for this player instance (e.g. TestPlayer_20260504, SpotifyPlayer). */
+    sessionName = 'Player',
+
+    /** Shown on deck A when the track has no `artwork_url` (e.g. local hero image) */
+    fallbackDeckArtworkSrc,
+    /** When false, deck A shows no cover/logo above transport controls. */
+    showDeckArtwork = true,
+    /** When false, sensing stays inline when detection starts (no fullscreen overlay on play). */
+    enableSensingOverlayOnScan = true,
+    /** Optional content rendered directly above the sensing UI (e.g. test tempo controls). */
+    sensingHeaderContent = null,
+    /** Deck A transport status (e.g. SoundCloud stream loading) */
+    deckATrackStatusMessage,
+    deckATrackStatusLoading = false,
+
+    /** When true, pressing Play bumps a counter so Face landmark / detection can start if idle */
+    autoStartLandmarkWithMusic = true,
+    /** Show/hide the "Second track" deck toggle controls. */
+    enableSecondDeck = true,
+    /** Show/hide previous/next transport controls on deck A. */
+    enableTrackNavigation = true,
+    /** Show/hide stop transport controls. */
+    enableStopButton = true,
+    /** When set (e.g. Spotify SDK), overrides deck A play/pause button state from audio element events. */
+    deckAIsPlaying = null,
+    /** Optional initial reaction policy instance for page-specific defaults. */
+    initialReactionPolicyInstance = null,
+    /** Optional ref filled by AdaptationOrchestrator for test-only thumb BPM overrides. */
+    thumbBpmControlRef = null,
+    /** Optional context tutorial button for deck A. */
+    showTutorialButton = false,
+    onTutorialButtonClick = null,
+    /** When false, hides the deck Mappings button and manual mapping editor (e.g. test sessions). */
+    enableMappingsButton = true,
+    /** Experiment adaptation mode label (e.g. Mode B) for playback-session analytics. */
+    adaptationMode = null,
+    /** Filled with { endPlaybackSession, setTrackSwitching } for timed sequence track boundaries. */
+    playbackAnalyticsRef = null,
 }) => {
     // Audio state
-    const [isPlaying, setIsPlaying] = useState(false);
-    const [duration, setDuration] = useState(0);
-    const [currentTime, setCurrentTime] = useState(0);
     const [error, setError] = useState('');
     
-    // Audio controls visibility state
-    const [showAudioControls, setShowAudioControls] = useState(true);
+    const [secondDeckActive, setSecondDeckActive] = useState(false);
     
     // Audio processing state
     const [volume, setVolume] = useState(0.5);
     const [baseVolume, setBaseVolume] = useState(0.5);
+    const [volumeDeckB, setVolumeDeckB] = useState(0.5);
+    const [baseVolumeDeckB, setBaseVolumeDeckB] = useState(0.5);
     const [stream, setStream] = useState(null);
-    const [noddingAmplitude, setNoddingAmplitude] = useState(0);
-    const [handsRaised, setHandsRaised] = useState(false);
-    
-    // Emotion data array for ReactionToSoundMapper
-    const [emotionDataArray, setEmotionDataArray] = useState([]);
-    
-    // Emotion mappings - use defaults from ReactionToSoundMapper
-    const [eqMappings, setEqMappings] = useState(DEFAULT_EQ_MAPPINGS);
-    const [volumeMappings, setVolumeMappings] = useState(DEFAULT_VOLUME_MAPPINGS);
-    const [rhythmicEnhancementMappings, setRhythmicEnhancementMappings] = useState(DEFAULT_RHYTHMIC_ENHANCEMENT_MAPPINGS);
-    const [reverbMappings, setReverbMappings] = useState(DEFAULT_REVERB_MAPPINGS);
-    const [delayMappings, setDelayMappings] = useState(DEFAULT_DELAY_MAPPINGS);
+
+    const initialReactionPolicyInstanceRef = useRef(
+        initialReactionPolicyInstance || createBuiltinStaticReactionPolicyInstance(),
+    );
+    const [reactionPolicyInstance, setReactionPolicyInstance] = useState(
+        () => initialReactionPolicyInstanceRef.current,
+    );
+    useEffect(() => {
+        if (!initialReactionPolicyInstance || typeof initialReactionPolicyInstance !== 'object') return;
+        initialReactionPolicyInstanceRef.current = initialReactionPolicyInstance;
+        setReactionPolicyInstance(initialReactionPolicyInstance);
+    }, [initialReactionPolicyInstance]);
+
+    const {
+        eqMappings,
+        volumeMappings,
+        rhythmicEnhancementMappings,
+        reverbMappings,
+        delayMappings,
+        keyShiftMappings,
+        bpmShiftMappings,
+    } = reactionPolicyInstance;
+
     const [currentRecommendation, setCurrentRecommendation] = useState(null);
     
     // UI state
     const [showEmotionMappings, setShowEmotionMappings] = useState(false);
     const [showAudioModal, setShowAudioModal] = useState(false);
+    const [loadedDeckATrack, setLoadedDeckATrack] = useState(null);
+    const [loadedDeckBTrack, setLoadedDeckBTrack] = useState(null);
     
-    // Demo session logic
-    const [is_demo_session, setIsDemoSession] = useState(false);
-    const [demo_username, setDemoUsername] = useState(() => getDemoUsername());
-    
-    // Detection mode state: 'landmark' or 'body'
-    const [detectionMode, setDetectionMode] = useState('landmark');
-    
-    // Tutorial functionality
-    const { isTutorialMode, toggleTutorialMode } = useTutorial();
-    const [playerTutorialDismissed, setPlayerTutorialDismissed] = useState(false);
-    
+    const [landmarkAutoStartTick, setLandmarkAutoStartTick] = useState(0);
+    const [detectionForceStopTick, setDetectionForceStopTick] = useState(0);
+    const [deckASoundConsoleOpen, setDeckASoundConsoleOpen] = useState(false);
+    const [deckBSoundConsoleOpen, setDeckBSoundConsoleOpen] = useState(false);
+    const isTrackSwitchingRef = useRef(false);
+    const previousThumbDeltaRef = useRef(0);
+    const previousBpmShiftPercentRef = useRef(0);
+
     const internalAudioRef = useRef(null);
     const audioRef = externalAudioRef || internalAudioRef;
+    const internalDeckBAudioRef = useRef(null);
+    const deckBAudioRef = externalDeckBAudioRef || internalDeckBAudioRef;
 
+    const reactionPolicyBundleRef = useRef({});
+    reactionPolicyBundleRef.current = reactionPolicyInstance;
+
+    const applyRecommendationToConsole = useAudioGraphCompiler(audioRef);
+    const playerSessionNameRef = useRef(sessionName);
+    const playerSessionName = playerSessionNameRef.current;
     // Track page view on component mount (guard against StrictMode double-invocation)
     const hasTrackedPageView = useRef(false);
     useEffect(() => {
         if (!hasTrackedPageView.current) {
             hasTrackedPageView.current = true;
             trackPageView({
-                pageName: pageName,
+                pageName: playerSessionName,
                 additionalData: {
+                    session_name: playerSessionName,
                     has_camera: !!stream,
-                    is_demo_session: is_demo_session,
                     has_selected_file: !!selectedFile,
-                    is_demo_track: isDemoTrack
-                }
+                },
             });
         }
     }, []);
 
     // Debug mapping changes - only log when they actually change
     useEffect(() => {
-    }, [eqMappings, volumeMappings, reverbMappings]);
+    }, [reactionPolicyInstance]);
 
     // Check if we have a valid audio source
     const hasValidAudioSource = useCallback(() => {
-        return selectedFile && 
-               audioRef.current && 
-               audioRef.current.src && 
-               audioRef.current.src !== '';
-    }, [selectedFile]);
+        return !!(
+            audioRef.current &&
+            audioRef.current.src &&
+            audioRef.current.src !== ''
+        );
+    }, [audioRef]);
+
+    const hasValidAudioSourceDeckB = useCallback(() => {
+        const el = deckBAudioRef.current;
+        if (!el) return false;
+        const hasSrc = !!(el.src && el.src !== '');
+        const hasMeta = el.readyState >= HTMLMediaElement.HAVE_METADATA;
+        return hasSrc || hasMeta || !!loadedDeckBTrack;
+    }, [deckBAudioRef, loadedDeckBTrack]);
+
+    // Main deck empty (no audio src) and nothing selected yet — load first playlist item
+    useEffect(() => {
+        if (!onTrackSelect || playlist.length === 0) {
+            return;
+        }
+        if (hasValidAudioSource()) {
+            return;
+        }
+        if (currentTrackIndex >= 0) {
+            return;
+        }
+        onTrackSelect(playlist[0], 0, false);
+    }, [playlist, onTrackSelect, hasValidAudioSource, currentTrackIndex]);
 
     // Handle EQ mapping change
     const handleEqMappingChange = (emotionState, presetName) => {
@@ -125,68 +208,81 @@ const Player = ({
         // Convert keyword to vector
         const eqVector = EQ_PRESETS[presetName] || EQ_PRESETS.flat;
         
-        setEqMappings(prev => {
-            const newMappings = {
-                ...prev,
-                [emotionState]: eqVector
-            };
-            return newMappings;
-        });
+        setReactionPolicyInstance((prev) => ({
+            ...prev,
+            eqMappings: {
+                ...prev.eqMappings,
+                [emotionState]: eqVector,
+            },
+        }));
     };
     
     // Handle volume mapping change
     const handleVolumeMappingChange = (emotionState, volumeMultiplier) => {
-        setVolumeMappings(prev => {
-            const newMappings = {
-                ...prev,
-                [emotionState]: parseFloat(volumeMultiplier)
-            };
-            return newMappings;
-        });
+        setReactionPolicyInstance((prev) => ({
+            ...prev,
+            volumeMappings: {
+                ...prev.volumeMappings,
+                [emotionState]: parseFloat(volumeMultiplier),
+            },
+        }));
     };
     
     
     // Handle rhythmic enhancement mapping change
     const handleRhythmicEnhancementMappingChange = (emotionState, rhythmicEnhancement) => {
-        setRhythmicEnhancementMappings(prev => {
-            const newMappings = {
-                ...prev,
-                [emotionState]: parseFloat(rhythmicEnhancement)
-            };
-            return newMappings;
-        });
+        setReactionPolicyInstance((prev) => ({
+            ...prev,
+            rhythmicEnhancementMappings: {
+                ...prev.rhythmicEnhancementMappings,
+                [emotionState]: parseFloat(rhythmicEnhancement),
+            },
+        }));
     };
 
     // Handle reverb mapping change
     const handleReverbMappingChange = (emotionState, reverbAmount) => {
-        setReverbMappings(prev => {
-            const newMappings = {
-                ...prev,
-                [emotionState]: parseFloat(reverbAmount)
-            };
-            return newMappings;
-        });
+        setReactionPolicyInstance((prev) => ({
+            ...prev,
+            reverbMappings: {
+                ...prev.reverbMappings,
+                [emotionState]: parseFloat(reverbAmount),
+            },
+        }));
     };
 
     // Handle delay mapping change
     const handleDelayMappingChange = (emotionState, delayAmount) => {
-        setDelayMappings(prev => {
-            const newMappings = {
-                ...prev,
-                [emotionState]: parseFloat(delayAmount)
-            };
-            return newMappings;
-        });
+        setReactionPolicyInstance((prev) => ({
+            ...prev,
+            delayMappings: {
+                ...prev.delayMappings,
+                [emotionState]: parseFloat(delayAmount),
+            },
+        }));
+    };
+
+    const handleKeyShiftMappingChange = (emotionState, semitones) => {
+        setReactionPolicyInstance((prev) => ({
+            ...prev,
+            keyShiftMappings: {
+                ...prev.keyShiftMappings,
+                [emotionState]: parseInt(semitones, 10),
+            },
+        }));
+    };
+
+    const handleBpmShiftMappingChange = (emotionState, percent) => {
+        setReactionPolicyInstance((prev) => ({
+            ...prev,
+            bpmShiftMappings: {
+                ...prev.bpmShiftMappings,
+                [emotionState]: parseInt(percent, 10),
+            },
+        }));
     };
     
-    // Handle reset to default mappings
-    const handleResetToDefaults = () => {
-        setEqMappings(DEFAULT_EQ_MAPPINGS);
-        setVolumeMappings(DEFAULT_VOLUME_MAPPINGS);
-        setRhythmicEnhancementMappings(DEFAULT_RHYTHMIC_ENHANCEMENT_MAPPINGS);
-        setReverbMappings(DEFAULT_REVERB_MAPPINGS);
-        setDelayMappings(DEFAULT_DELAY_MAPPINGS);
-    };
+ 
 
     // Handle volume change
     const handleVolumeChange = useCallback((newVolume) => {
@@ -195,104 +291,187 @@ const Player = ({
         setBaseVolume(volumeValue);
     }, []);
 
+    const handleVolumeChangeDeckB = useCallback((newVolume) => {
+        const volumeValue = parseFloat(newVolume);
+        setVolumeDeckB(volumeValue);
+        setBaseVolumeDeckB(volumeValue);
+    }, []);
 
-    // Collect facial landmark data from localStorage
-    useEffect(() => {
-        const collectFacialLandmarkData = () => {
-            try {
-                let storedFaceData = null;
-                let storedFaceVisible = null;
-                
-                try {
-                    storedFaceData = localStorage.getItem('face_position_data_arrays');
-                    storedFaceVisible = localStorage.getItem('face_visible');
-                } catch (storageError) {
-                    // Silent error handling
-                    return;
-                }
-                
-                if (storedFaceData && storedFaceVisible === 'true') {
-                    try {
-                        const parsedArrays = JSON.parse(storedFaceData);
-                        
-                        const latestAmplitude = parsedArrays.noddingAmplitude || 0;
-                        const latestFrequency = parsedArrays.noddingFrequency || 0;
-                        
-                        setNoddingAmplitude(latestAmplitude);
-                        
-                        const dataPoints = parsedArrays.timestamps.map((timestamp, index) => ({
-                            timestamp: timestamp,
-                            smiling: parsedArrays.smilingArray ? parsedArrays.smilingArray[index] : 0,
-                            jawOpen: parsedArrays.jawOpenArray ? parsedArrays.jawOpenArray[index] : 0,
-                            frequency: parsedArrays.frequencyArray ? parsedArrays.frequencyArray[index] : latestFrequency,
-                            amplitude: parsedArrays.amplitudeArray ? parsedArrays.amplitudeArray[index] : latestAmplitude,
-                            xPosition: parsedArrays.centerXPositions[index],
-                            yPosition: parsedArrays.centerYPositions[index],
-                            width: parsedArrays.widthPositions[index],
-                            height: parsedArrays.heightPositions[index]
-                        }));
-                        
-                        setEmotionDataArray(dataPoints);
-                        
-                    } catch (parseError) {
-                        // Silent error handling
-                    }
-                } else {
-                    setEmotionDataArray([]);
-                    setNoddingAmplitude(0);
-                }
-                
-                // Collect hand raising data from localStorage
-                try {
-                    const leftHandRaised = localStorage.getItem('left_hand_raised') === 'true';
-                    const rightHandRaised = localStorage.getItem('right_hand_raised') === 'true';
-                    setHandsRaised(leftHandRaised || rightHandRaised);
-                } catch (error) {
-                    setHandsRaised(false);
-                }
-                
-            } catch (error) {
-                // Silent error handling
+    const resolveActiveTrackName = useCallback(() => {
+        return (
+            loadedDeckATrack?.displayName ||
+            selectedFile?.name ||
+            selectedFile?.title ||
+            selectedFile?.fileName ||
+            'unknown_track'
+        );
+    }, [loadedDeckATrack, selectedFile]);
+
+    const resolveActiveTrackId = useCallback(
+        () => resolveTrackIdFromSources(loadedDeckATrack, selectedFile),
+        [loadedDeckATrack, selectedFile],
+    );
+
+    const resolveActiveArtist = useCallback(() => {
+        const t = loadedDeckATrack || selectedFile;
+        if (!t) return '';
+        return (
+            t.artist ||
+            t.user?.username ||
+            t.user?.full_name ||
+            t.scTrack?.user?.username ||
+            t.scTrack?.user?.full_name ||
+            t.spTrack?.artists?.map((a) => a.name).join(', ') ||
+            ''
+        );
+    }, [loadedDeckATrack, selectedFile]);
+
+    const resolveDeckBArtist = useCallback(() => {
+        const t = loadedDeckBTrack;
+        if (!t) return '';
+        return (
+            t.artist ||
+            t.user?.username ||
+            t.user?.full_name ||
+            t.scTrack?.user?.username ||
+            t.scTrack?.user?.full_name ||
+            t.spTrack?.artists?.map((a) => a.name).join(', ') ||
+            ''
+        );
+    }, [loadedDeckBTrack]);
+
+    const resolveActiveTrackBaseBpm = useCallback(() => {
+        const candidates = [
+            loadedDeckATrack?.bpm,
+            selectedFile?.bpm,
+            selectedFile?.BPM,
+            selectedFile?.track_bpm,
+        ];
+        for (const candidate of candidates) {
+            const n = Number(candidate);
+            if (Number.isFinite(n) && n > 0) {
+                return n;
             }
+        }
+        const fallbackBpm = Number(window.localStorage.getItem('calibration_original_bpm'));
+        return Number.isFinite(fallbackBpm) && fallbackBpm > 0 ? fallbackBpm : null;
+    }, [loadedDeckATrack, selectedFile]);
+
+    const handleReactionCompileOutput = useCallback(
+        (output) => {
+            const recommendation = output?.recommendation || null;
+            const nextThumbDelta = Number(recommendation?.persistentThumbBpmDeltaBpm) || 0;
+            const prevThumbDelta = Number(previousThumbDeltaRef.current) || 0;
+            const thumbDeltaChange = nextThumbDelta - prevThumbDelta;
+            const direction =
+                output?.tempoDirection === 'up' || output?.tempoDirection === 'down'
+                    ? output.tempoDirection
+                    : thumbDeltaChange > 0
+                      ? 'up'
+                      : thumbDeltaChange < 0
+                        ? 'down'
+                        : null;
+
+            if (direction) {
+                const fromButton = output?.tempoChangeSource === 'button';
+                const baseBpm = resolveActiveTrackBaseBpm();
+                const trackId = resolveActiveTrackId();
+                const previousBpmShiftPercent = Number(previousBpmShiftPercentRef.current) || 0;
+                const nextBpmShiftPercent = Number(recommendation?.bpmShiftPercent) || 0;
+                const oldBpm =
+                    Number.isFinite(baseBpm) && baseBpm > 0
+                        ? baseBpm * (1 + previousBpmShiftPercent / 100)
+                        : null;
+                const newBpm =
+                    Number.isFinite(baseBpm) && baseBpm > 0
+                        ? baseBpm * (1 + nextBpmShiftPercent / 100)
+                        : null;
+
+                void trackSimpleEvent({
+                    interaction_type: fromButton ? 'tempo_button' : 'tempo_thumb',
+                    element_id: fromButton
+                        ? direction === 'up'
+                            ? 'mode_c_tempo_up_button'
+                            : 'mode_c_tempo_down_button'
+                        : 'thumb_command',
+                    session_name: playerSessionName,
+                    page_url: window.location.href,
+                    timestamp: Date.now(),
+                    metadata: {
+                        track_id: trackId,
+                        song_name: resolveActiveTrackName(),
+                        song_artist: resolveActiveArtist(),
+                        old_bpm: Number.isFinite(oldBpm) ? Number(oldBpm.toFixed(3)) : null,
+                        new_bpm: Number.isFinite(newBpm) ? Number(newBpm.toFixed(3)) : null,
+                        direction,
+                        ...(fromButton
+                            ? { trigger: 'mode_c_tempo_button' }
+                            : {}),
+                    },
+                });
+            }
+
+            previousThumbDeltaRef.current = nextThumbDelta;
+            previousBpmShiftPercentRef.current = Number(recommendation?.bpmShiftPercent) || 0;
+            setCurrentRecommendation(recommendation);
+            applyRecommendationToConsole(output);
+        },
+        [
+            applyRecommendationToConsole,
+            playerSessionName,
+            resolveActiveArtist,
+            resolveActiveTrackId,
+            resolveActiveTrackBaseBpm,
+            resolveActiveTrackName,
+        ],
+    );
+
+    const noddingAmplitudeForDeckUi = Number(currentRecommendation?.noddingAmplitude) || 0;
+
+    const resolvePlaybackExperimentConfig = useCallback(() => {
+        if (adaptationMode !== 'Mode B') {
+            return null;
+        }
+        const baseBpm = resolveActiveTrackBaseBpm();
+        if (!Number.isFinite(baseBpm) || baseBpm <= 0) {
+            return null;
+        }
+        const bpmShiftPercent = Number(currentRecommendation?.bpmShiftPercent) || 0;
+        const newBpm = baseBpm * (1 + bpmShiftPercent / 100);
+        return {
+            original_bpm: Number(baseBpm.toFixed(3)),
+            new_bpm: Number(newBpm.toFixed(3)),
         };
-        
-        collectFacialLandmarkData();
-        // Read more frequently to catch data before it's cleared
-        const interval = setInterval(collectFacialLandmarkData, 200);
-        
+    }, [adaptationMode, currentRecommendation, resolveActiveTrackBaseBpm]);
+
+    const { startPlaybackSession, endPlaybackSession } = usePlaybackSessionAnalytics({
+        sessionName: playerSessionName,
+        resolveTrackName: resolveActiveTrackName,
+        resolveTrackId: resolveActiveTrackId,
+        resolvePlaybackExperimentConfig,
+    });
+
+    useEffect(() => {
+        if (!playbackAnalyticsRef) {
+            return undefined;
+        }
+        playbackAnalyticsRef.current = {
+            endPlaybackSession,
+            setTrackSwitching: (switching) => {
+                isTrackSwitchingRef.current = Boolean(switching);
+            },
+        };
         return () => {
-            clearInterval(interval);
+            playbackAnalyticsRef.current = null;
         };
-    }, []);
-    
-    // Handle recommendations from ReactionToSoundMapper - simplified approach
-    const handleRecommendationChange = useCallback((recommendation) => {
-        // Handle recommendation change
-        
-        // Store the recommendation in state so it can be passed to SoundConsole
-        setCurrentRecommendation(recommendation);
-        
-        // Also pass the recommendation to SoundConsole for processing
-        if (audioRef.current && audioRef.current.soundConsoleMethods && audioRef.current.soundConsoleMethods.applyRecommendation) {
-            audioRef.current.soundConsoleMethods.applyRecommendation(recommendation);
-        }
-    }, []);
-
-    // Set demo session mode
+    }, [endPlaybackSession, playbackAnalyticsRef]);
+    // Initialize camera stream on mount so detection is always available
     useEffect(() => {
-        if (isDemoTrack) {
-            setIsDemoSession(true);
-        } else {
-            const storedToken = localStorage.getItem('idToken');
-            setIsDemoSession(!storedToken);
-        }
-    }, [isDemoTrack]);
+        let mediaStream = null;
 
-    // Initialize camera stream
-    useEffect(() => {
         const initializeCamera = async () => {
             try {
-                const mediaStream = await navigator.mediaDevices.getUserMedia({ 
+                mediaStream = await navigator.mediaDevices.getUserMedia({ 
                     video: { 
                         facingMode: 'user',
                         width: { ideal: 640 },
@@ -307,187 +486,358 @@ const Player = ({
             }
         };
 
-        if (selectedFile) {
-            initializeCamera();
-        }
+        initializeCamera();
 
         return () => {
+            if (mediaStream) {
+                mediaStream.getTracks().forEach(track => track.stop());
+            }
+        };
+    }, []);
+
+
+    const deckATransport = useDeckTransport({
+        audioRef,
+        hasValidAudioSource,
+        setError,
+        missingElementMessage: 'Audio element not found',
+        missingSourceMessage: 'Please select an audio track first',
+        unsupportedProcessingMessage: 'Audio processing not supported in this browser',
+        playbackFailedPrefix: 'Failed to play audio: ',
+        mediaLoadErrorMessage: 'Error loading audio file. Please try another file.',
+        onPlay: () => {
+            startPlaybackSession();
+            onMusicPlay?.();
+        },
+        onPause: () => {
+            onMusicPause?.();
+        },
+        onStop: () => {
+            void endPlaybackSession('stop_button');
             if (stream) {
-                stream.getTracks().forEach(track => track.stop());
+                setDetectionForceStopTick((t) => t + 1);
             }
-        };
-    }, [selectedFile]);
+        },
+        onTrackEndedNoAutoNext: () => {
+            void endPlaybackSession('track_ended');
+        },
+        autoStartLandmarkWithMusic,
+        setLandmarkAutoStartTick,
+        selectedFile,
+        playlist,
+        currentTrackIndex,
+        onTrackSelect,
+        isTrackSwitchingRef,
+    });
 
-
-    // Handle play/pause
-    const handlePlayPause = async () => {
-        if (!audioRef.current) {
-            // Audio ref is null
-            setError('Audio element not found');
-            return;
-        }
-
-        if (!selectedFile) {
-            // No file selected
-            setError('Please select an audio file first');
-            return;
-        }
-
-        try {
-            // Initialize audio context with user interaction
-            if (audioRef.current && audioRef.current.soundConsoleMethods) {
-                const success = await audioRef.current.soundConsoleMethods.initializeAudioContext();
-                if (!success) {
-                    setError('Audio processing not supported in this browser');
-                    return;
-                }
-                
-                const audioContext = audioRef.current.audioContextRef?.current;
-                if (audioContext && audioContext.state === 'suspended') {
-                    // Resume suspended audio context (required for secure contexts)
-                    try {
-                        await audioContext.resume();
-                    } catch (resumeError) {
-                        // Continue anyway, might still work
-                    }
-                }
-                
-                // Ensure all effects are created after audio context is active
-                if (audioRef.current.soundConsoleMethods.forceAllEffectsCreation) {
-                    setTimeout(() => {
-                        audioRef.current.soundConsoleMethods.forceAllEffectsCreation();
-                    }, 200);
-                }
-            }
-            
-            if (isPlaying) {
-                audioRef.current.pause();
-                setIsPlaying(false);
-                if (onMusicPause) onMusicPause();
-            } else {
-                await audioRef.current.play();
-                setIsPlaying(true);
-                if (onMusicPlay) onMusicPlay();
-            }
-            
-        } catch (error) {
-            setError(`Failed to play audio: ${error.message}`);
-        }
-    };
-
-    // Handle stop
-    const handleStop = () => {
-        if (audioRef.current) {
-            audioRef.current.pause();
-            audioRef.current.currentTime = 0;
-            setIsPlaying(false);
-            setCurrentTime(0);
-            if (onMusicPause) onMusicPause();
-        }
-    };
-
-    // Handle next track
-    const handleNext = () => {
-        if (playlist.length > 0 && currentTrackIndex >= 0) {
-            const nextIndex = currentTrackIndex + 1;
-            if (nextIndex < playlist.length) {
-                onTrackSelect(playlist[nextIndex], nextIndex, isPlaying);
-            }
-        }
-    };
-
-    // Handle previous track
-    const handlePrevious = () => {
-        if (playlist.length > 0 && currentTrackIndex >= 0) {
-            const prevIndex = currentTrackIndex - 1;
-            if (prevIndex >= 0) {
-                onTrackSelect(playlist[prevIndex], prevIndex, isPlaying);
-            }
-        }
-    };
-
-    // Audio event handlers
     useEffect(() => {
-        const audio = audioRef.current;
-        if (!audio) return;
+        if (typeof deckAIsPlaying === 'boolean') {
+            deckATransport.setIsPlaying(deckAIsPlaying);
+        }
+    }, [deckAIsPlaying, deckATransport]);
 
-        const handleLoadedMetadata = () => {
-            setDuration(audio.duration);
+    const deckAIsPlayingEffective = deckAIsPlaying ?? deckATransport.isPlaying;
+
+    useEffect(() => {
+        setActivePlaybackTrack({
+            track_id: resolveActiveTrackId(),
+            song_name: resolveActiveTrackName(),
+            song_artist: resolveActiveArtist(),
+            isPlaying: Boolean(deckAIsPlayingEffective),
+        });
+        return () => setActivePlaybackTrack(null);
+    }, [
+        resolveActiveTrackId,
+        resolveActiveTrackName,
+        resolveActiveArtist,
+        deckAIsPlayingEffective,
+    ]);
+
+    const deckBTransport = useDeckTransport({
+        audioRef: deckBAudioRef,
+        hasValidAudioSource: hasValidAudioSourceDeckB,
+        setError,
+        missingElementMessage: 'Second track audio element not found',
+        missingSourceMessage: 'Please load a track into the second player first',
+        unsupportedProcessingMessage: 'Second track: audio processing not supported in this browser',
+        playbackFailedPrefix: 'Second track playback failed: ',
+        mediaLoadErrorMessage: 'Error loading second track audio',
+        autoStartLandmarkWithMusic,
+        setLandmarkAutoStartTick,
+        selectedFile: loadedDeckBTrack,
+    });
+
+    // Handle dropping/loading a track into deck A or B
+    const handleLoadTrackToDeck = useCallback(async (deckId, track) => {
+        if (!track) {
+            return;
+        }
+
+        const normalizedDeckTrack = {
+            ...track,
+            displayName: track.name || track.title || track.file?.name || 'Unknown track',
+            loadedAt: Date.now()
         };
 
-        const handleTimeUpdate = () => {
-            setCurrentTime(audio.currentTime);
-        };
+        if (deckId === 'A') {
+            setLoadedDeckATrack(normalizedDeckTrack);
 
-        const handleEnded = () => {
-            setIsPlaying(false);
-            setCurrentTime(0);
-            if (onMusicPause) onMusicPause();
-            
-            // Auto-play next track if in playlist mode
-            if (playlist.length > 0 && currentTrackIndex >= 0) {
-                const nextIndex = currentTrackIndex + 1;
-                if (nextIndex < playlist.length) {
-                    setTimeout(() => {
-                        onTrackSelect(playlist[nextIndex], nextIndex, true);
-                    }, 500);
+            if (onTrackSelect) {
+                const droppedPlaylistIndex = typeof track.playlistIndex === 'number' ? track.playlistIndex : -1;
+                const playlistIndex = droppedPlaylistIndex >= 0
+                    ? droppedPlaylistIndex
+                    : playlist.findIndex((playlistTrack) =>
+                        (playlistTrack.id && track.id && playlistTrack.id === track.id) ||
+                        (playlistTrack.name && track.name && playlistTrack.name === track.name)
+                    );
+
+                // Load track into active player transport when possible.
+                if (playlistIndex >= 0) {
+                    onTrackSelect(playlist[playlistIndex], playlistIndex, false);
+                } else {
+                    onTrackSelect(track, currentTrackIndex, false);
                 }
             }
-        };
-
-        const handleError = () => {
-            setError('Error loading audio file. Please try another file.');
-            setIsPlaying(false);
-        };
-
-        audio.addEventListener('loadedmetadata', handleLoadedMetadata);
-        audio.addEventListener('timeupdate', handleTimeUpdate);
-        audio.addEventListener('ended', handleEnded);
-        audio.addEventListener('error', handleError);
-
-        return () => {
-            audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
-            audio.removeEventListener('timeupdate', handleTimeUpdate);
-            audio.removeEventListener('ended', handleEnded);
-            audio.removeEventListener('error', handleError);
-        };
-    }, [selectedFile, playlist, currentTrackIndex, onTrackSelect]);
-
-    // Handle progress bar click
-    const handleProgressClick = (event) => {
-        if (audioRef.current && duration > 0) {
-            const progressBar = event.currentTarget;
-            const clickX = event.nativeEvent.offsetX;
-            const width = progressBar.offsetWidth;
-            const newTime = (clickX / width) * duration;
-            audioRef.current.currentTime = newTime;
-            setCurrentTime(newTime);
+            return;
         }
-    };
 
-    // Handle detection mode change
-    const handleDetectionModeChange = (mode) => {
-        setDetectionMode(mode);
-    };
+        if (deckId === 'B') {
+            setLoadedDeckBTrack(normalizedDeckTrack);
+
+            if (onLoadDeckBTrack) {
+                await onLoadDeckBTrack(track);
+                return;
+            }
+
+            if (deckBAudioRef.current) {
+                // Local fallback loading when no external Deck B loader is provided.
+                const deckB = deckBAudioRef.current;
+                deckB.pause();
+                if (track.file) {
+                    const audioUrl = URL.createObjectURL(track.file);
+                    deckB.crossOrigin = null;
+                    deckB.src = audioUrl;
+                    deckB.load();
+                } else if (track.url) {
+                    deckB.crossOrigin = 'anonymous';
+                    deckB.src = track.url;
+                    deckB.load();
+                } else {
+                    setError('Second track could not be loaded');
+                }
+            }
+        }
+    }, [onTrackSelect, playlist, currentTrackIndex, onLoadDeckBTrack, deckBAudioRef]);
+
+    const deck1TrackArtworkUrl =
+        resolveDeckArtworkUrl(loadedDeckATrack) || resolveDeckArtworkUrl(selectedFile);
+    const deck1ArtworkUrl = showDeckArtwork
+        ? deck1TrackArtworkUrl || fallbackDeckArtworkSrc || logoSmall
+        : deck1TrackArtworkUrl || null;
+    const deck2ArtworkUrl = resolveDeckArtworkUrl(loadedDeckBTrack) || logoSmall;
+    const deck1ArtworkSizePx = secondDeckActive ? 96 : 120;
+    const deck2ArtworkSizePx = 96;
 
     return (
         <Container fluid className="mt-4 px-3">
-            {/* Tutorial Message */}
-            {isTutorialMode && !playerTutorialDismissed && (
-                <TutorialMessage 
-                    messages={[
-                        "Welcome to the Soundbloom player ! Use your webcam to detect your facial expressions, head nodding, hand raising, and adjust the audio in real-time.",
-                        "Get music started, allow to capture face movements capture, and play with audio effects.",
-                        "You can customize audio mappings to create your own personal audio experience."
-                    ]}
-                    position="top-center"
-                    onClose={() => setPlayerTutorialDismissed(true)}
-                />
-            )}
-
             <div className="bg-dark rounded p-4" style={{ backgroundColor: '#1a1a1a' }}>
-                {/* Additional content (track selection, playlist, etc.) */}
-                {children}
+                {topContent}
+                {/* Playback controls, detection, and sound console — above library / track UI */}
+                <div className="d-flex flex-column mb-4" style={{ width: '100%', overflow: 'visible' }}>
+                    {enableSecondDeck && (
+                        <div className="d-flex justify-content-end mb-2 flex-wrap gap-2">
+                            {!secondDeckActive && (
+                                <Button
+                                    variant="outline-light"
+                                    size="sm"
+                                    type="button"
+                                    onClick={() => setSecondDeckActive(true)}
+                                    style={{ fontSize: '0.8rem', borderColor: secondaryColor }}
+                                >
+                                    Second track
+                                </Button>
+                            )}
+                            {secondDeckActive && (
+                                <Button
+                                    variant="outline-secondary"
+                                    size="sm"
+                                    type="button"
+                                    onClick={() => {
+                                        setSecondDeckActive(false);
+                                        deckBTransport.handleStop();
+                                    }}
+                                    style={{ fontSize: '0.8rem' }}
+                                >
+                                    Remove second track
+                                </Button>
+                            )}
+                        </div>
+                    )}
+
+                    <div className="row g-3">
+                        <div className={secondDeckActive ? 'col-12 col-lg-6' : 'col-12'}>
+                            <Deck
+                                audioRef={audioRef}
+                                volume={volume}
+                                baseVolume={baseVolume}
+                                onVolumeChange={handleVolumeChange}
+                                eqMappings={eqMappings}
+                                volumeMappings={volumeMappings}
+                                recommendation={currentRecommendation}
+                                rhythmicEnhancementMappings={rhythmicEnhancementMappings}
+                                reverbMappings={reverbMappings}
+                                noddingAmplitude={noddingAmplitudeForDeckUi}
+                                consoleZIndex={1045}
+                                onOpenMappings={
+                                    enableMappingsButton ? () => setShowEmotionMappings(true) : undefined
+                                }
+                                showMappingsButton={enableMappingsButton}
+                                soundConsoleOpen={deckASoundConsoleOpen}
+                                onSoundConsoleOpenChange={setDeckASoundConsoleOpen}
+                            >
+                                <DeckControls
+                                    deckId="A"
+                                    analyticsSessionName={playerSessionName}
+                                    currentTrackId={resolveActiveTrackId()}
+                                    currentSongArtist={resolveActiveArtist()}
+                                    onLoadTrack={handleLoadTrackToDeck}
+                                    loadedTrackName={loadedDeckATrack?.displayName || selectedFile?.name || ''}
+                                    isPlaying={deckAIsPlaying ?? deckATransport.isPlaying}
+                                    currentTime={deckATransport.currentTime}
+                                    duration={deckATransport.duration}
+                                    hasValidAudioSource={hasValidAudioSource}
+                                    onPlayPause={deckATransport.handlePlayPause}
+                                    onStop={deckATransport.handleStop}
+                                    onPrevious={deckATransport.handlePrevious}
+                                    onNext={deckATransport.handleNext}
+                                    onProgressSeek={deckATransport.handleProgressSeek}
+                                    hasPrevious={playlist.length > 0 && currentTrackIndex > 0}
+                                    hasNext={playlist.length > 0 && currentTrackIndex < playlist.length - 1}
+                                    iconSize={secondDeckActive ? '1.68rem' : '2.1rem'}
+                                    showPreviousNext={enableTrackNavigation}
+                                    showStopButton={enableStopButton}
+                                    showAudioDevice={!secondDeckActive}
+                                    showSoundConsole={!secondDeckActive}
+                                    showTutorial={showTutorialButton && !secondDeckActive}
+                                    onAudioDeviceClick={
+                                        secondDeckActive ? undefined : () => setShowAudioModal(true)
+                                    }
+                                    onSoundConsoleClick={
+                                        secondDeckActive ? undefined : () => setDeckASoundConsoleOpen(true)
+                                    }
+                                    tutorialDismissed={true}
+                                    setTutorialDismissed={() => {}}
+                                    onTutorialClick={onTutorialButtonClick}
+                                    artworkUrl={deck1ArtworkUrl}
+                                    showArtwork={showDeckArtwork}
+                                    artworkSizePx={deck1ArtworkSizePx}
+                                    trackStatusMessage={deckATrackStatusMessage}
+                                    trackStatusLoading={deckATrackStatusLoading}
+                                />
+                            </Deck>
+                        </div>
+                        {secondDeckActive && (
+                            <div className="col-12 col-lg-6">
+                                <Deck
+                                    audioRef={deckBAudioRef}
+                                    volume={volumeDeckB}
+                                    baseVolume={baseVolumeDeckB}
+                                    onVolumeChange={handleVolumeChangeDeckB}
+                                    eqMappings={eqMappings}
+                                    volumeMappings={volumeMappings}
+                                    recommendation={null}
+                                    rhythmicEnhancementMappings={rhythmicEnhancementMappings}
+                                    reverbMappings={reverbMappings}
+                                    noddingAmplitude={noddingAmplitudeForDeckUi}
+                                    consoleZIndex={1055}
+                                    onOpenMappings={
+                                        enableMappingsButton ? () => setShowEmotionMappings(true) : undefined
+                                    }
+                                    showMappingsButton={enableMappingsButton}
+                                    soundConsoleOpen={deckBSoundConsoleOpen}
+                                    onSoundConsoleOpenChange={setDeckBSoundConsoleOpen}
+                                >
+                                    <DeckControls
+                                        deckId="B"
+                                        analyticsSessionName={playerSessionName}
+                                        currentTrackId={resolveTrackIdFromSources(loadedDeckBTrack)}
+                                        currentSongArtist={resolveDeckBArtist()}
+                                        onLoadTrack={handleLoadTrackToDeck}
+                                        loadedTrackName={loadedDeckBTrack?.displayName || ''}
+                                        isPlaying={deckBTransport.isPlaying}
+                                        currentTime={deckBTransport.currentTime}
+                                        duration={deckBTransport.duration}
+                                        hasValidAudioSource={hasValidAudioSourceDeckB}
+                                        onPlayPause={deckBTransport.handlePlayPause}
+                                        onStop={deckBTransport.handleStop}
+                                        onProgressSeek={deckBTransport.handleProgressSeek}
+                                        hasPrevious={false}
+                                        hasNext={false}
+                                        iconSize="1.68rem"
+                                        showPreviousNext={false}
+                                        showStopButton={enableStopButton}
+                                        artworkUrl={deck2ArtworkUrl}
+                                        artworkSizePx={deck2ArtworkSizePx}
+                                    />
+                                </Deck>
+                            </div>
+                        )}
+                    </div>
+
+                    {secondDeckActive && (
+                        <div
+                            className="deck-controls-actions--solo d-flex justify-content-center align-items-center gap-3 mt-3 mb-1 flex-wrap"
+                            style={{ overflow: 'visible', rowGap: '0.35rem' }}
+                        >
+                            <AudioDeviceButton
+                                onClick={() => setShowAudioModal(true)}
+                                size="1.82rem"
+                                showTooltip={true}
+                                tooltipText="Audio Device Settings"
+                            />
+                            <SettingsButton
+                                showSettings={false}
+                                onToggleSettings={() => setDeckASoundConsoleOpen(true)}
+                                size="1.82rem"
+                                showTooltip={true}
+                                tooltipText="Sound console"
+                            />
+                        </div>
+                    )}
+
+                    {sensingHeaderContent ? (
+                        <div
+                            style={{
+                                width: '100%',
+                                position: 'relative',
+                                zIndex: 1,
+                                clear: 'both',
+                                marginTop: '0.5rem',
+                                marginBottom: '0.5rem',
+                            }}
+                        >
+                            {sensingHeaderContent}
+                        </div>
+                    ) : null}
+                    {/* Detection UI — face, pose, and hands in one pipeline */}
+                    {stream && (
+                        <div style={{ width: '100%', position: 'relative', zIndex: 1, clear: 'both', marginTop: '0.5rem', marginBottom: '1rem' }}>
+                            <AdaptationOrchestrator
+                                policyBundleRef={reactionPolicyBundleRef}
+                                stream={stream}
+                                sensingSessionName={`${playerSessionName}_session`}
+                                sensingSizeMode="large"
+                                autoStartLandmarkTick={autoStartLandmarkWithMusic ? landmarkAutoStartTick : 0}
+                                forceStopDetectionTick={detectionForceStopTick}
+                                enabled={!!stream}
+                                enableSensingOverlayOnScan={enableSensingOverlayOnScan}
+                                nodTrackBpmAudioRef={audioRef}
+                                onReactionOutput={handleReactionCompileOutput}
+                                thumbBpmControlRef={thumbBpmControlRef}
+                            />
+                        </div>
+                    )}
+                </div>
 
                 {/* Error Display */}
                 {error && (
@@ -496,154 +846,96 @@ const Player = ({
                     </Alert>
                 )}
 
-                {/* Audio Controls */}
-                {selectedFile && (
-                    <div className="d-flex flex-column" style={{ width: '100%', overflow: 'visible' }}>
-                        <AudioControls
-                            isPlaying={isPlaying}
-                            currentTime={currentTime}
-                            duration={duration}
-                            hasValidAudioSource={hasValidAudioSource}
-                            onPlayPause={handlePlayPause}
-                            onStop={handleStop}
-                            onPrevious={handlePrevious}
-                            onNext={handleNext}
-                            onProgressClick={handleProgressClick}
-                            onAudioDeviceClick={() => setShowAudioModal(true)}
-                            onEmotionMappingClick={() => setShowEmotionMappings(true)}
-                            detectionMode={detectionMode}
-                            onDetectionModeChange={handleDetectionModeChange}
-                            tutorialDismissed={playerTutorialDismissed}
-                            setTutorialDismissed={setPlayerTutorialDismissed}
-                            hasPrevious={playlist.length > 0 && currentTrackIndex > 0}
-                            hasNext={playlist.length > 0 && currentTrackIndex < playlist.length - 1}
-                            showPreviousNext={playlist.length > 0}
-                            showAudioDevice={true}
-                            showEmotionMapping={true}
-                            showTutorial={true}
-                            style={{ marginBottom: '0' }}
-                        />
-
-                        {/* Detection UI - Conditional rendering based on mode */}
-                        {stream && (
-                            <div style={{ width: '100%', position: 'relative', zIndex: 1, clear: 'both', marginTop: '0.5rem', marginBottom: '1rem' }}>
-                                {detectionMode === 'landmark' && (
-                                    <FacialLandmarkUserUI 
-                                        stream={stream}
-                                        embeddingTW={false}
-                                        is_demo_session={is_demo_session}
-                                        demo_username={demo_username}
-                                        sessionName={`${pageName}_session`}
-                                        sizeMode="large"
-                                    />
-                                )}
-                                {detectionMode === 'body' && (
-                                    <BodyPoseUserUI 
-                                        stream={stream}
-                                        embeddingTW={false}
-                                        is_demo_session={is_demo_session}
-                                        demo_username={demo_username}
-                                        sessionName={`${pageName}_session`}
-                                        sizeMode="large"
-                                    />
-                                )}
-                            </div>
-                        )}
-
-                        {/* SoundConsole Component */}
-                        <StyledCard className="mb-4" style={{ position: 'relative', zIndex: 0, width: '100%', clear: 'both', marginTop: '1rem' }}>
-                            <div className="d-flex align-items-center justify-content-between mb-3">
-                                <Text style={{ margin: 0, fontSize: '1.1rem', fontWeight: 'bold' }}>
-                                    Sound Console
-                                </Text>
-                                <div className="d-flex gap-2 align-items-center">
-                                    <ExpandReduceButton
-                                        isExpanded={showAudioControls}
-                                        onToggle={() => setShowAudioControls(!showAudioControls)}
-                                    />
-                                </div>
-                            </div>
-                            
-                            {showAudioControls && (
-                                <SoundConsole
-                                    audioRef={audioRef}
-                                    volume={volume}
-                                    baseVolume={baseVolume}
-                                    onVolumeChange={handleVolumeChange}
-                                    eqMappings={eqMappings}
-                                    volumeMappings={volumeMappings}
-                                    recommendation={currentRecommendation}
-                                    rhythmicEnhancementMappings={rhythmicEnhancementMappings}
-                                    reverbMappings={reverbMappings}
-                                    noddingAmplitude={noddingAmplitude}
-                                />
-                            )}
-                        </StyledCard>
-                    </div>
-                )}
+                {/* Additional content (track selection, playlist, library, etc.) */}
+                {children}
 
                 {/* Hidden Audio Element */}
                 <audio 
                     ref={audioRef} 
                     preload="metadata"
+                    crossOrigin="anonymous"
                     onLoadedMetadata={() => {
                         if (audioRef.current) {
-                            setDuration(audioRef.current.duration);
+                            deckATransport.setDuration(audioRef.current.duration);
                         }
                     }}
                     onTimeUpdate={() => {
                         if (audioRef.current) {
-                            setCurrentTime(audioRef.current.currentTime);
+                            deckATransport.setCurrentTime(audioRef.current.currentTime);
                         }
                     }}
                     onEnded={() => {
-                        setIsPlaying(false);
-                        setCurrentTime(0);
+                        deckATransport.setIsPlaying(false);
+                        deckATransport.setCurrentTime(0);
                     }}
                     onPlay={() => {
-                        setIsPlaying(true);
+                        isTrackSwitchingRef.current = false;
+                        startPlaybackSession();
+                        deckATransport.setIsPlaying(true);
                         if (onMusicPlay) onMusicPlay();
                     }}
                     onPause={() => {
-                        setIsPlaying(false);
+                        if (!isTrackSwitchingRef.current) {
+                            void endPlaybackSession('pause');
+                        }
+                        deckATransport.setIsPlaying(false);
                         if (onMusicPause) onMusicPause();
                     }}
                     onError={(e) => {
                         // Audio error
                         setError('Error loading audio file');
-                        setIsPlaying(false);
+                        deckATransport.setIsPlaying(false);
+                    }}
+                />
+
+                {/* Hidden Deck B Audio Element */}
+                <audio
+                    ref={deckBAudioRef}
+                    preload="metadata"
+                    crossOrigin="anonymous"
+                    onLoadedMetadata={() => {
+                        if (deckBAudioRef.current) {
+                            deckBTransport.setDuration(deckBAudioRef.current.duration || 0);
+                        }
+                    }}
+                    onDurationChange={() => {
+                        if (deckBAudioRef.current) {
+                            const d = deckBAudioRef.current.duration;
+                            if (Number.isFinite(d) && d > 0) {
+                                deckBTransport.setDuration(d);
+                            }
+                        }
+                    }}
+                    onTimeUpdate={() => {
+                        if (deckBAudioRef.current) {
+                            deckBTransport.setCurrentTime(deckBAudioRef.current.currentTime || 0);
+                        }
+                    }}
+                    onEnded={() => {
+                        deckBTransport.setIsPlaying(false);
+                        deckBTransport.setCurrentTime(0);
+                    }}
+                    onPlay={() => {
+                        deckBTransport.setIsPlaying(true);
+                    }}
+                    onPause={() => {
+                        deckBTransport.setIsPlaying(false);
+                    }}
+                    onError={() => {
+                        setError('Error loading second track audio file');
+                        deckBTransport.setIsPlaying(false);
                     }}
                 />
             </div>
 
             {/* Facial Landmark Detection Section */}
-            {selectedFile && (
-                <>
-                    {stream ? (
-                        <>
-                            <ReactionToSoundMapper
-                                emotionDataArray={emotionDataArray}
-                                noddingAmplitude={noddingAmplitude}
-                                handsRaised={handsRaised}
-                                eqMappings={eqMappings}
-                                volumeMappings={volumeMappings}
-                                rhythmicEnhancementMappings={rhythmicEnhancementMappings}
-                                reverbMappings={reverbMappings}
-                                delayMappings={delayMappings}
-                                onRecommendationChange={(recommendation) => {
-                                    // ReactionToSoundMapper calling onRecommendationChange
-                                    handleRecommendationChange(recommendation);
-                                }}
-                            />
-                            
-                        </>
-                    ) : (
-                        <div className="text-center py-4">
-                            <Text>Please allow camera access to enable facial landmark detection features.</Text>
-                        </div>
-                    )}
-                </>
-            )}
+            <>
+                {stream ? null : (
+                    <div className="text-center py-4">
+                        <Text>Please allow camera access to enable face, body, and hand sensing.</Text>
+                    </div>
+                )}
+            </>
 
             {/* Audio Device Selection Modal */}
             <AudioDeviceSelector 
@@ -651,21 +943,26 @@ const Player = ({
                 onHide={() => setShowAudioModal(false)}
             />
             
-            {/* Manual Mapping Component */}
-            <ManualMapping
-                eqMappings={eqMappings}
-                onEmotionMappingChange={handleEqMappingChange}
-                volumeMappings={volumeMappings}
-                onVolumeMappingChange={handleVolumeMappingChange}
-                rhythmicEnhancementMappings={rhythmicEnhancementMappings}
-                onRhythmicEnhancementMappingChange={handleRhythmicEnhancementMappingChange}
-                reverbMappings={reverbMappings}
-                onReverbMappingChange={handleReverbMappingChange}
-                delayMappings={delayMappings}
-                onDelayMappingChange={handleDelayMappingChange}
-                showEmotionMappings={showEmotionMappings}
-                onToggleEmotionMappings={setShowEmotionMappings}
-            />
+            {enableMappingsButton && (
+                <ManualMapping
+                    eqMappings={eqMappings}
+                    onEmotionMappingChange={handleEqMappingChange}
+                    volumeMappings={volumeMappings}
+                    onVolumeMappingChange={handleVolumeMappingChange}
+                    rhythmicEnhancementMappings={rhythmicEnhancementMappings}
+                    onRhythmicEnhancementMappingChange={handleRhythmicEnhancementMappingChange}
+                    reverbMappings={reverbMappings}
+                    onReverbMappingChange={handleReverbMappingChange}
+                    delayMappings={delayMappings}
+                    onDelayMappingChange={handleDelayMappingChange}
+                    keyShiftMappings={keyShiftMappings}
+                    onKeyShiftMappingChange={handleKeyShiftMappingChange}
+                    bpmShiftMappings={bpmShiftMappings}
+                    onBpmShiftMappingChange={handleBpmShiftMappingChange}
+                    showEmotionMappings={showEmotionMappings}
+                    onToggleEmotionMappings={setShowEmotionMappings}
+                />
+            )}
             
         </Container>
     );

@@ -3,7 +3,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { fetchTokens } from '../utils/Auth';
 import UserAPI from '../utils/UserAPI';
-import EnvironmentVariables from '../utils/EnvironmentVariables';
+import EnvironmentVariables from '../EnvironmentVariables';
+import { parseProcessDataResponse } from '../utils/parseProcessDataResponse';
 
 export default function Callback() {
     const { handleLogin } = useAuth();
@@ -12,85 +13,74 @@ export default function Callback() {
 
     useEffect(() => {
         const processAuth = async () => {
-            // Prevent double processing
             if (processedRef.current) return;
             processedRef.current = true;
 
             try {
                 const params = new URLSearchParams(window.location.search);
                 const code = params.get('code');
-                
+
                 if (!code) {
                     throw new Error('No authorization code found');
                 }
 
-                console.log('code', code);
-
-                // Check if we're in prod or test environment for PKCE flow
-                if (EnvironmentVariables.environment_flag === 'prod' || EnvironmentVariables.environment_flag === 'test') {
-                    // PROD/TEST: Use PKCE flow with fetchTokens
-                    console.log(`${EnvironmentVariables.environment_flag.toUpperCase()}: Using PKCE flow for confidential client`);
-                    console.log('🔍 Callback: Checking sessionStorage for code_verifier');
-                    console.log('🔍 Callback: sessionStorage code_verifier:', sessionStorage.getItem('code_verifier'));
-                    console.log('🔍 Callback: All sessionStorage keys:', Object.keys(sessionStorage));
-                    
-                    const tokens = await fetchTokens(code);
-                    
-                    if (!tokens) {
-                        throw new Error('Failed to retrieve tokens via PKCE');
-                    }
-
-                    handleLogin(tokens);
-                    createUser();
-                    navigate('/');
-                } else {
-                    // NON-PROD/TEST: Use existing logic for standard OAuth flow
-                    console.log('NON-PROD/TEST: Using standard OAuth flow');
-                    
-                    // For non-prod/test, you might need to implement standard token exchange here
-                    // or ensure fetchTokens handles non-prod/test environments properly
-                    const tokens = await fetchTokens(code);
-                    
-                    if (!tokens) {
-                        throw new Error('Failed to retrieve tokens');
-                    }
-
-                    handleLogin(tokens);
-                    createUser();
-                    navigate('/');
+                const tokens = await fetchTokens(code);
+                if (!tokens) {
+                    throw new Error('Failed to retrieve tokens');
                 }
 
+                handleLogin(tokens);
+
+                const { isNewUser } = await registerUserIfNeeded();
+                navigate('/', {
+                    replace: true,
+                    state: isNewUser ? { showUserProfileForm: true } : {},
+                });
             } catch (error) {
                 console.error('Authentication error:', error);
                 navigate('/', {
-                    state: { error: 'Authentication failed. Please try again.' }
+                    replace: true,
+                    state: { error: 'Authentication failed. Please try again.' },
                 });
             }
         };
 
-        const createUser = async () => {
+        /** POST /process-data newuser; returns whether the account was just created. */
+        const registerUserIfNeeded = async () => {
             const idToken = localStorage.getItem('idToken');
+            if (!idToken) {
+                return { isNewUser: false };
+            }
             const requestBody = JSON.stringify({
-                'request_type': 'user',
-                'idToken': idToken,
-                'user_request_type': 'newuser'
+                request_type: 'user',
+                idToken,
+                user_request_type: 'newuser',
             });
-            await console.log('API request:', requestBody);
-            // Call API for new user creation
-            await UserAPI(requestBody);
-        }
+            const apiResult = await UserAPI(requestBody);
+            const parsed = parseProcessDataResponse(apiResult);
+            if (!parsed || parsed.statusCode !== 200) {
+                console.warn('registerUserIfNeeded: unexpected response', apiResult);
+                return { isNewUser: false };
+            }
+            const { payload } = parsed;
+            const isNewUser =
+                payload?.is_new_user === true ||
+                payload?.message === 'User created successfully';
+            return { isNewUser };
+        };
 
-        processAuth();
-        
+        void processAuth();
     }, [handleLogin, navigate]);
 
     return (
-        <div style={{ 
-            display: 'flex', 
-            justifyContent: 'center', 
-            alignItems: 'center', 
-            height: '100vh' 
-        }}>
+        <div
+            style={{
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                height: '100vh',
+            }}
+        >
             Processing login...
         </div>
     );

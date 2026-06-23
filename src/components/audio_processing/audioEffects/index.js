@@ -22,6 +22,31 @@ import {
     reset as resetDelay 
 } from './delay';
 
+export {
+    createKeyShiftProcessor,
+    processKeyShift,
+    resetKeyShift,
+    clampKeyShiftSemitones,
+    KEY_SHIFT_SEMITONE_MIN,
+    KEY_SHIFT_SEMITONE_MAX,
+} from './keyShift';
+
+export {
+    applyBpmShift,
+    resetBpmShift,
+    clampBpmShiftPercent,
+    BPM_SHIFT_PERCENT_MIN,
+    BPM_SHIFT_PERCENT_MAX,
+} from './bpmShift';
+
+export {
+    applyBpmKeyShift,
+    resetBpmKeyShift,
+    clampBpmKeyShiftPercent,
+    BPM_KEY_SHIFT_PERCENT_MIN,
+    BPM_KEY_SHIFT_PERCENT_MAX,
+} from './bpmKeyShift';
+
 export const AUDIO_EFFECTS = {
     rhythmicEnhancement: {
         createProcessor: createRhythmicEnhancementProcessor,

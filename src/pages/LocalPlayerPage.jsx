@@ -1,12 +1,11 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { Image } from 'react-bootstrap';
-import { Subtitle, StyledCard } from '../utils/StyledComponents';
-import ExpandReduceButton from '../utils/ExpandReduceButton';
-import { secondaryColor } from '../utils/DisplaySettings';
+import { Subtitle, StyledCard } from '../styles/StyledComponents';
+import ExpandReduceButton from '../buttons/ExpandReduceButton';
 import Player from '../components/player/Player';
-import PlaylistCard from '../components/player/PlaylistCard';
-import MusicLibraryPanel from '../components/player/MusicLibraryPanel';
-import magicPlayerImage from '../images/magicplayer.png';
+import PlaylistCard from '../components/library_panels/PlaylistCard';
+import MusicLibraryPanel from '../components/library_panels/MusicLibraryPanel';
+import magicPlayerImage from '../images/logo_small.png';
 
 const LocalPlayerPage = () => {
     const [selectedFile, setSelectedFile] = useState(null);
@@ -15,12 +14,6 @@ const LocalPlayerPage = () => {
     const [isFromLibrary, setIsFromLibrary] = useState(false);
     const [error, setError] = useState('');
     const audioRef = useRef(null);
-
-    // Check if we have a placeholder file (folder selection without specific file)
-    const isPlaceholderFile = useCallback(() => {
-        return selectedFile && selectedFile.name && selectedFile.name.includes(' - Music Library');
-    }, [selectedFile]);
-
 
     // Handle playlist change (reorder, remove, etc.)
     const handlePlaylistChange = useCallback((newPlaylist, newCurrentIndex) => {
@@ -138,9 +131,6 @@ const LocalPlayerPage = () => {
         }
     }, []);
 
-    // Check if user is logged in for demo session logic
-    const isDemoSession = !localStorage.getItem('idToken');
-
     // Auto-create placeholder file when component mounts (folder was selected)
     React.useEffect(() => {
         if (!selectedFile) {
@@ -150,8 +140,6 @@ const LocalPlayerPage = () => {
         }
     }, [selectedFile]);
 
-    // Store the selected folder from WelcomePlayerPage
-    const [selectedFolder, setSelectedFolder] = useState(null);
     const [musicFiles, setMusicFiles] = useState([]);
     const [isMusicLibraryExpanded, setIsMusicLibraryExpanded] = useState(true);
 
@@ -164,36 +152,28 @@ const LocalPlayerPage = () => {
     }, []);
 
     return (
-        <Player
-            selectedFile={selectedFile}
-            isDemoTrack={false}
-            pageName="local-player"
-            audioRef={audioRef}
-            playlist={playlist}
-            currentTrackIndex={currentTrackIndex}
-            onPlaylistChange={handlePlaylistChange}
-            onTrackSelect={handlePlaylistTrackSelect}
-        >
-            {/* Welcome Image - Only show when no file is selected */}
-            {!selectedFile && (
-                <div className="text-center mb-4">
-                    <Image
-                        src={magicPlayerImage}
-                        alt="Magic Player"
-                        fluid
-                        style={{ maxWidth: '100%' }}
-                    />
-                </div>
-            )}
-
-            {/* File Selection Display */}
-            {selectedFile && !isPlaceholderFile() && (
-                <div className="text-center mb-4">
-                    <Subtitle style={{ margin: 0 }}>
-                        <strong>Playing:</strong> {selectedFile.name}
-                    </Subtitle>
-                </div>
-            )}
+        <>
+            <Player
+                selectedFile={selectedFile}
+                sessionName="LocalPlayer"
+                audioRef={audioRef}
+                playlist={playlist}
+                currentTrackIndex={currentTrackIndex}
+                onPlaylistChange={handlePlaylistChange}
+                onTrackSelect={handlePlaylistTrackSelect}
+                fallbackDeckArtworkSrc={magicPlayerImage}
+            >
+                {/* Welcome Image - Only show when no file is selected */}
+                {!selectedFile && (
+                    <div className="text-center mb-4">
+                        <Image
+                            src={magicPlayerImage}
+                            alt="Player logo"
+                            fluid
+                            style={{ maxWidth: '100%' }}
+                        />
+                    </div>
+                )}
 
             {/* Playlist Card - Only show when in library mode and playlist has tracks */}
             {isFromLibrary && (playlist.length > 0 || selectedFile) && (
@@ -225,7 +205,6 @@ const LocalPlayerPage = () => {
                         onFileSelect={handleMusicLibraryFileSelect}
                         onAddToPlaylist={handleAddToPlaylist}
                         onFolderLoaded={handleMusicLibraryFolderLoaded}
-                        isDemoSession={isDemoSession}
                         musicFiles={musicFiles}
                         playlist={playlist}
                     />
@@ -233,12 +212,13 @@ const LocalPlayerPage = () => {
             </StyledCard>
 
             {/* Error Display */}
-            {error && (
-                <div className="alert alert-danger mb-4">
-                    {error}
-                </div>
-            )}
-        </Player>
+                {error && (
+                    <div className="alert alert-danger mb-4">
+                        {error}
+                    </div>
+                )}
+            </Player>
+        </>
     );
 };
 

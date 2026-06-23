@@ -5,7 +5,7 @@
  * allowing users to customize how detected emotions affect audio parameters.
  * 
  * FEATURES:
- * - Emotion state configuration (nodding, smiling, surprised, neutral combinations)
+ * - Emotion state configuration (nodding, smiling, mouth open, neutral combinations)
  * - EQ preset mapping for each emotion state
  * - Volume multiplier mapping for each emotion state
  * - Rhythmic enhancement mapping for each emotion state
@@ -30,10 +30,26 @@
 
 import React, { useState } from 'react';
 import { Form } from 'react-bootstrap';
-import { Subtitle, Text } from '../../utils/StyledComponents';
+import { Subtitle, Text } from '../../styles/StyledComponents';
 import { secondaryColor } from '../../utils/DisplaySettings';
 import settingsIcon from '../../images/settingsicon.png';
-import CloseButton from '../../utils/CloseButton';
+import CloseButton from '../../buttons/CloseButton';
+import {
+    KEY_SHIFT_SEMITONE_MIN,
+    KEY_SHIFT_SEMITONE_MAX
+} from '../audio_processing/audioEffects/keyShift';
+import {
+    resolveKeyShiftForPlaybackProfile as resolveKeyShiftSemitonesForEmotion,
+    resolveVolumeMultiplierForPlaybackProfile as resolveVolumeMultiplierForEmotion,
+} from '../../music_adaptation/policy/mappingDefaults.v1';
+import {
+    REACTION_PLAYBACK_PROFILE_UI_ROWS,
+    REACTION_PLAYBACK_PROFILE,
+} from '../../music_adaptation/policy/playbackProfiles.v1';
+import {
+    BPM_SHIFT_PERCENT_MIN,
+    BPM_SHIFT_PERCENT_MAX
+} from '../audio_processing/audioEffects/bpmShift';
 
 const ManualMapping = ({
     // Emotion mapping state
@@ -55,24 +71,24 @@ const ManualMapping = ({
     // Delay mapping state
     delayMappings,
     onDelayMappingChange,
+
+    // Key / BPM mapping state
+    keyShiftMappings,
+    onKeyShiftMappingChange,
+    bpmShiftMappings,
+    onBpmShiftMappingChange,
     
     // Visibility control
     showEmotionMappings,
     onToggleEmotionMappings
 }) => {
-    // State for selected emotion
-    const [selectedEmotion, setSelectedEmotion] = useState('nodding+happy');
-    
-    // Available emotion states
-    const emotionStates = [
-        { key: 'nodding+happy', label: 'Nodding + Smiling', icon: '' },
-        { key: 'nodding+surprised', label: 'Nodding + Surprised', icon: '' },
-        { key: 'nodding+neutral', label: 'Nodding + Neutral', icon: '' },
-        { key: 'handsRaised', label: 'Hands Raised', icon: '' },
-        { key: 'happy', label: 'Smiling', icon: '' },
-        { key: 'surprised', label: 'Surprised', icon: '' },
-        { key: 'neutral', label: 'Neutral', icon: '' }
-    ];
+    const [selectedEmotion, setSelectedEmotion] = useState(REACTION_PLAYBACK_PROFILE.NODDING_SMILING);
+
+    const emotionStates = REACTION_PLAYBACK_PROFILE_UI_ROWS.map((row) => ({
+        key: row.id,
+        label: row.label,
+        icon: '',
+    }));
     
     // EQ band labels and frequencies
     const eqBands = [
@@ -117,6 +133,14 @@ const ManualMapping = ({
     const handleDelayMappingChange = (delayAmount) => {
         onDelayMappingChange(selectedEmotion, parseFloat(delayAmount));
     };
+
+    const handleKeyShiftMappingChange = (semitones) => {
+        onKeyShiftMappingChange(selectedEmotion, parseInt(semitones, 10));
+    };
+
+    const handleBpmShiftMappingChange = (percent) => {
+        onBpmShiftMappingChange(selectedEmotion, parseInt(percent, 10));
+    };
     
     // Get current values for selected emotion
     const getCurrentEqValue = (bandIndex) => {
@@ -127,9 +151,8 @@ const ManualMapping = ({
         return 0;
     };
     
-    const getCurrentVolumeValue = () => {
-        return (volumeMappings[selectedEmotion] || 1.0) * 100;
-    };
+    const getCurrentVolumeValue = () =>
+        resolveVolumeMultiplierForEmotion(volumeMappings, selectedEmotion) * 100;
     
     const getCurrentRhythmicEnhancementValue = () => {
         return rhythmicEnhancementMappings[selectedEmotion] || 0;
@@ -141,6 +164,13 @@ const ManualMapping = ({
     
     const getCurrentDelayValue = () => {
         return delayMappings[selectedEmotion] || 0;
+    };
+
+    const getCurrentKeyShiftValue = () =>
+        resolveKeyShiftSemitonesForEmotion(keyShiftMappings, selectedEmotion);
+
+    const getCurrentBpmShiftValue = () => {
+        return bpmShiftMappings[selectedEmotion] ?? 0;
     };
 
     return (
@@ -345,28 +375,58 @@ const ManualMapping = ({
                             />
                         </div>
 
-                        <div 
-                            className="mt-4 pt-3" 
-                            style={{ 
-                                borderTop: `1px solid #333`,
-                                backgroundColor: '#2a2a2a',
-                                borderRadius: '0.5rem',
-                                padding: '1rem'
-                            }}
-                        >
-                            <Text style={{ fontSize: '0.9rem', opacity: 0.8, margin: 0 }}>
-                                <strong>Tips:</strong>
-                            </Text>
-                            <ul style={{ fontSize: '0.8rem', opacity: 0.7, marginTop: '0.5rem', marginBottom: 0 }}>
-                                <li>Select an emotion from the dropdown to configure its audio parameters</li>
-                                <li>EQ bands range from -15dB to +15dB for precise frequency control</li>
-                                <li>Volume multipliers range from 70% (Quiet) to 145% (Maximum)</li>
-                                <li>Rhythmic enhancement ranges from Off (0%) to Maximum (100%)</li>
-                                <li>Reverb amounts range from Off (0%) to Maximum (100%)</li>
-                                <li>Delay amounts range from Off (0%) to Maximum (100%)</li>
-                                <li>Nodding states scale EQ intensity and volume based on head movement amplitude (0-3)</li>
-                                <li>Changes apply immediately - try different emotions to test your settings!</li>
-                            </ul>
+                        {/* Key shift (manual mapping) */}
+                        <div className="mb-4">
+                            <div className="d-flex justify-content-between align-items-center mb-2">
+                                <Text style={{ fontSize: '1rem', margin: 0, fontWeight: 'bold' }}>Key shift:</Text>
+                                <Text style={{ fontSize: '1rem', margin: 0, color: secondaryColor, fontWeight: 'bold' }}>
+                                    {getCurrentKeyShiftValue() === 0
+                                        ? 'Original'
+                                        : `${getCurrentKeyShiftValue() > 0 ? '+' : ''}${getCurrentKeyShiftValue()} semitones`}
+                                </Text>
+                            </div>
+                            <div className="d-flex align-items-center gap-3">
+                                <span style={{ fontSize: '0.8rem', whiteSpace: 'nowrap' }}>{KEY_SHIFT_SEMITONE_MIN}</span>
+                                <Form.Range
+                                    min={KEY_SHIFT_SEMITONE_MIN}
+                                    max={KEY_SHIFT_SEMITONE_MAX}
+                                    step="1"
+                                    value={getCurrentKeyShiftValue()}
+                                    onChange={(e) => handleKeyShiftMappingChange(e.target.value)}
+                                    style={{
+                                        flex: 1,
+                                        background: `linear-gradient(to right, #333 0%, #333 ${((getCurrentKeyShiftValue() - KEY_SHIFT_SEMITONE_MIN) / (KEY_SHIFT_SEMITONE_MAX - KEY_SHIFT_SEMITONE_MIN)) * 100}%, ${secondaryColor} ${((getCurrentKeyShiftValue() - KEY_SHIFT_SEMITONE_MIN) / (KEY_SHIFT_SEMITONE_MAX - KEY_SHIFT_SEMITONE_MIN)) * 100}%, ${secondaryColor} 100%)`
+                                    }}
+                                />
+                                <span style={{ fontSize: '0.8rem', whiteSpace: 'nowrap' }}>+{KEY_SHIFT_SEMITONE_MAX}</span>
+                            </div>
+                        </div>
+
+                        {/* BPM shift (manual mapping) */}
+                        <div className="mb-4">
+                            <div className="d-flex justify-content-between align-items-center mb-2">
+                                <Text style={{ fontSize: '1rem', margin: 0, fontWeight: 'bold' }}>BPM shift:</Text>
+                                <Text style={{ fontSize: '1rem', margin: 0, color: secondaryColor, fontWeight: 'bold' }}>
+                                    {getCurrentBpmShiftValue() === 0
+                                        ? 'Original'
+                                        : `${getCurrentBpmShiftValue() > 0 ? '+' : ''}${getCurrentBpmShiftValue()}%`}
+                                </Text>
+                            </div>
+                            <div className="d-flex align-items-center gap-3">
+                                <span style={{ fontSize: '0.8rem', whiteSpace: 'nowrap' }}>{BPM_SHIFT_PERCENT_MIN}%</span>
+                                <Form.Range
+                                    min={BPM_SHIFT_PERCENT_MIN}
+                                    max={BPM_SHIFT_PERCENT_MAX}
+                                    step="1"
+                                    value={getCurrentBpmShiftValue()}
+                                    onChange={(e) => handleBpmShiftMappingChange(e.target.value)}
+                                    style={{
+                                        flex: 1,
+                                        background: `linear-gradient(to right, #333 0%, #333 ${((getCurrentBpmShiftValue() - BPM_SHIFT_PERCENT_MIN) / (BPM_SHIFT_PERCENT_MAX - BPM_SHIFT_PERCENT_MIN)) * 100}%, ${secondaryColor} ${((getCurrentBpmShiftValue() - BPM_SHIFT_PERCENT_MIN) / (BPM_SHIFT_PERCENT_MAX - BPM_SHIFT_PERCENT_MIN)) * 100}%, ${secondaryColor} 100%)`
+                                    }}
+                                />
+                                <span style={{ fontSize: '0.8rem', whiteSpace: 'nowrap' }}>+{BPM_SHIFT_PERCENT_MAX}%</span>
+                            </div>
                         </div>
                     </div>
                 </div>
